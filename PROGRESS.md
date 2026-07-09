@@ -13,9 +13,9 @@ Estado vivo del proyecto. **Leer este archivo al comienzo de cualquier sesión d
 | Hito | Estado |
 |---|---|
 | M0 — Documentos de fundación | ✅ completo |
-| M1 — Estructura de carpetas | 🔄 en progreso |
-| M2 — Base de datos completa | pendiente |
-| M3 — Núcleo y configuración inicial | pendiente |
+| M1 — Estructura de carpetas | ✅ completo |
+| M2 — Base de datos completa | ✅ completo |
+| M3 — Núcleo y configuración inicial | 🔄 en progreso |
 | M4 — Identidad y acceso | pendiente |
 | M5 — Catálogo e inventario | pendiente |
 | M6 — Terceros | pendiente |
@@ -42,7 +42,12 @@ Estado vivo del proyecto. **Leer este archivo al comienzo de cualquier sesión d
   - Licencias: token firmado Ed25519 + anti-retroceso de reloj + verificación online oportunista (no depende solo del reloj del sistema).
   - Sincronización: estación servidor principal con FastAPI+WebSockets embebido, last-write-wins con log de conflictos.
   - Idioma: código en inglés, documentación y UI en español.
-- **Siguiente paso al retomar**: iniciar M1 (Fase 2) — crear el árbol de carpetas físico de FOLDER_STRUCTURE.md, `pyproject.toml` con dependencias de TECHNOLOGIES.md, configuración de ruff/mypy/pytest, y un `src/pos/main.py` mínimo que solo abra una ventana vacía (sin lógica de negocio) para validar que el empaquetado PySide6 funciona.
+- Completado M1: árbol de carpetas físico completo (core, shared_ui, 21 módulos con capas domain/application/infrastructure/presentation, tests, migrations, scripts, docs, resources, installer, android), `pyproject.toml`, `.gitignore`, `README.md`, `alembic.ini`, `src/pos/main.py` mínimo (solo abre ventana vacía, sin lógica de negocio).
+- Creado `.venv` con Python 3.13 (el Python 3.15 del sistema es una beta sin wheels de PySide6 disponibles aún — usar 3.13 para desarrollo hasta que el ecosistema se ponga al día). Instalación de dependencias (`pip install -e ".[dev]"`) lanzada en background; verificar resultado al retomar con `Read` sobre el output del proceso o reintentando `pip install -e ".[dev]"`.
+- Instalación de dependencias verificada: `.venv` con Python 3.13 funcional, todas las librerías de TECHNOLOGIES.md importan correctamente, `python -m pos.main` abre una `QMainWindow` vacía sin errores.
+- Completado M2: `core/database/base.py` (mixins de auditoría: `UUIDMixin`, `TimestampMixin`, `UserStampMixin`, `SoftDeleteMixin`), `core/database/session.py` (engine + `session_scope`), 54 modelos SQLAlchemy en los 20 módulos de negocio (ver DATABASE.md, sección "Implementación"), `core/database/model_registry.py` como registro central, `migrations/env.py` + `script.py.mako`, primera migración Alembic autogenerada y verificada, `scripts/seed_demo_data.py` verificado end-to-end. `ruff check` y `mypy --strict` pasan limpio sobre todo `src/`.
+- Decisión de arquitectura fijada durante la implementación (documentada en ARCHITECTURE.md §12b y DATABASE.md): las FK entre módulos se declaran por nombre de tabla en string (`ForeignKey("products.id")`), nunca importando la clase ORM de otro módulo; los enums de estado se implementan como `enum.Enum` de Python + `sqlalchemy.Enum(native_enum=False)`, no como tablas de catálogo, salvo que el valor deba ser configurable desde la UI (roles, permisos, promociones sí son tablas).
+- **Siguiente paso al retomar**: iniciar M3 (Fase 4, primer módulo) — completar `core/`: `core/config` (gestor de configuración que lee/escribe `business_settings` con caché en memoria), `core/di` (contenedor simple de inyección de dependencias), `core/security` (hashing Argon2 ya usado en el seed, gestión de sesión activa, bloqueo por intentos fallidos usando `LoginAttempt`), `core/events` (bus de eventos interno en memoria), `core/logging` (configuración centralizada). Luego cablear `main.py` para inicializar el engine con la URL de configuración y mostrar una pantalla de login real (arranca M4).
 
 ## Cómo retomar el trabajo tras un corte de contexto
 

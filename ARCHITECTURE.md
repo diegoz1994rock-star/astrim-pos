@@ -103,6 +103,14 @@ Cliente delgado sin base de datos propia: consume la misma API HTTP/WebSocket qu
 - `infrastructure` se prueba contra una SQLite en memoria real (no mocks del ORM) para detectar problemas reales de esquema/consulta.
 - `presentation` se prueba con `pytest-qt` para los flujos críticos (login, venta, cierre de caja).
 
+## 12b. Convención ORM para no acoplar módulos vía claves foráneas
+
+Los modelos SQLAlchemy de un módulo pueden necesitar una clave foránea hacia una tabla de otro módulo (ej. `sale_items.product_id` → `products.id`). Para no violar la regla de "un módulo no importa la infraestructura de otro" (sección 5), la convención es:
+
+- La `ForeignKey` se declara por **nombre de tabla en string** (`ForeignKey("products.id")`), nunca importando la clase ORM del otro módulo.
+- No se declaran atributos `relationship()` de navegación **entre módulos distintos** (sí se permiten dentro del mismo módulo, ej. `Sale.items`). Para obtener datos relacionados de otro módulo se hace una consulta explícita a través del repositorio de ese módulo, o se consume vía evento.
+- Todos los modelos comparten la misma `Base`/`MetaData` (`core/database/base.py`) para que Alembic pueda generar un único historial de migraciones consistente, aunque el código Python de cada módulo permanezca desacoplado.
+
 ## 13. Decisiones que se reconsiderarán y por qué
 
 - **SQLite → PostgreSQL/MySQL**: la capa de repositorios está diseñada para que este cambio sea de configuración, pero se validará realmente cuando el volumen de estaciones sincronizadas lo justifique (documentado como deuda consciente, no ausencia de diseño).
