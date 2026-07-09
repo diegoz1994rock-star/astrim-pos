@@ -9,8 +9,8 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Configuración inicial / núcleo | `core/`, `modules/settings/` | — | completo |
 | Base de datos | `core/database/`, `migrations/` | — | completo |
 | Login / Autenticación | `modules/auth/` | users, roles | completo |
-| Usuarios | `modules/users/` | roles | pendiente |
-| Roles y Permisos | `modules/roles/` | — | pendiente |
+| Usuarios | `modules/users/` | roles | completo |
+| Roles y Permisos | `modules/roles/` | — | completo |
 | Clientes | `modules/customers/` | — | pendiente |
 | Proveedores | `modules/suppliers/` | — | pendiente |
 | Productos y Categorías | `modules/products/` | inventory (stock) | pendiente |

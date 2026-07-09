@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -35,8 +36,16 @@ from pos.core.security.session import ActiveSession, SessionManager
 from pos.modules.auth.application.authentication_service import AuthenticationService
 from pos.modules.auth.presentation.login_view import LoginView
 from pos.modules.auth.presentation.login_view_model import LoginViewModel
+from pos.modules.roles.application.role_management_service import RoleManagementService
+from pos.modules.roles.presentation.roles_view import RolesView
+from pos.modules.roles.presentation.roles_view_model import RolesViewModel
 from pos.modules.settings.application.business_settings_service import BusinessSettingsService
+from pos.modules.users.application.user_management_service import UserManagementService
+from pos.modules.users.presentation.users_view import UsersView
+from pos.modules.users.presentation.users_view_model import UsersViewModel
 from pos.shared_ui.theme.theme_manager import ThemeManager
+
+_ADMIN_PERMISSION_CODE = "users.manage"
 
 
 def bootstrap_core(container: Container) -> BootstrapConfig:
@@ -59,6 +68,8 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     container.register_singleton(
         AuthenticationService, lambda: AuthenticationService(session_manager, event_bus)
     )
+    container.register_singleton(RoleManagementService, lambda: RoleManagementService(event_bus))
+    container.register_singleton(UserManagementService, lambda: UserManagementService(event_bus))
     return config
 
 
@@ -74,13 +85,35 @@ def build_application() -> QApplication:
     return app
 
 
-def build_welcome_widget(session: ActiveSession, on_logout: Callable[[], None]) -> QWidget:
-    """Pantalla temporal mostrada tras un login exitoso.
+def build_admin_widget(
+    user_service: UserManagementService,
+    role_service: RoleManagementService,
+    on_back: Callable[[], None],
+) -> QWidget:
+    """Panel de administración: pestañas de Usuarios y Roles/Permisos."""
+    widget = QWidget()
+    layout = QVBoxLayout(widget)
 
-    Es solo un punto de prueba de extremo a extremo del núcleo (sesión +
-    tema + eventos); el panel real por rol (Usuarios, Ventas, etc.) se
-    construye módulo por módulo en las siguientes etapas.
-    """
+    back_button = QPushButton("← Volver")
+    back_button.clicked.connect(on_back)
+    layout.addWidget(back_button)
+
+    tabs = QTabWidget()
+    tabs.addTab(UsersView(UsersViewModel(user_service, role_service)), "Usuarios")
+    tabs.addTab(RolesView(RolesViewModel(role_service)), "Roles y permisos")
+    layout.addWidget(tabs)
+
+    return widget
+
+
+def build_welcome_widget(
+    session: ActiveSession,
+    on_logout: Callable[[], None],
+    on_open_admin: Callable[[], None] | None,
+) -> QWidget:
+    """Pantalla mostrada tras un login exitoso: bienvenida + accesos según
+    el rol. El panel real por módulo de negocio (Ventas, Inventario, etc.)
+    se agrega en las siguientes etapas de desarrollo."""
     outer_layout = QVBoxLayout()
     outer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -93,12 +126,17 @@ def build_welcome_widget(session: ActiveSession, on_logout: Callable[[], None]) 
 
     welcome_label = QLabel(f"Bienvenido, {session.full_name}")
     welcome_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    card_layout.addWidget(welcome_label)
+
+    if on_open_admin is not None:
+        admin_button = QPushButton("Administración")
+        admin_button.clicked.connect(on_open_admin)
+        card_layout.addWidget(admin_button)
 
     logout_button = QPushButton("Cerrar sesión")
     logout_button.clicked.connect(on_logout)
-
-    card_layout.addWidget(welcome_label)
     card_layout.addWidget(logout_button)
+
     outer_layout.addWidget(card)
 
     widget = QWidget()
@@ -109,6 +147,8 @@ def build_welcome_widget(session: ActiveSession, on_logout: Callable[[], None]) 
 def build_main_window(
     theme_manager: ThemeManager,
     auth_service: AuthenticationService,
+    user_service: UserManagementService,
+    role_service: RoleManagementService,
 ) -> QMainWindow:
     """Construye la ventana principal: arranca mostrando el login y, tras
     autenticar, cambia al contenido de la aplicación."""
@@ -127,7 +167,19 @@ def build_main_window(
             auth_service.logout()
             show_login()
 
-        window.setCentralWidget(build_welcome_widget(session, handle_logout))
+        def open_admin() -> None:
+            window.setCentralWidget(
+                build_admin_widget(
+                    user_service, role_service, on_back=lambda: show_welcome(session)
+                )
+            )
+
+        can_administer = session.has_permission(_ADMIN_PERMISSION_CODE)
+        window.setCentralWidget(
+            build_welcome_widget(
+                session, handle_logout, open_admin if can_administer else None
+            )
+        )
 
     show_login()
     return window
@@ -143,7 +195,9 @@ def main() -> int:
     container.register_instance(ThemeManager, theme_manager)
 
     auth_service = container.resolve(AuthenticationService)
-    window = build_main_window(theme_manager, auth_service)
+    user_service = container.resolve(UserManagementService)
+    role_service = container.resolve(RoleManagementService)
+    window = build_main_window(theme_manager, auth_service, user_service, role_service)
     window.show()
     return app.exec()
 

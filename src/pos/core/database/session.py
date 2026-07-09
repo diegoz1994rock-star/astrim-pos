@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 _engine: Engine | None = None
@@ -23,7 +24,28 @@ def init_engine(database_url: str, *, echo: bool = False) -> Engine:
     global _engine, _session_factory
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     _engine = create_engine(database_url, echo=echo, connect_args=connect_args)
-    _session_factory = sessionmaker(bind=_engine, autoflush=False, expire_on_commit=False)
+
+    if database_url.startswith("sqlite"):
+        # SQLite no aplica restricciones de clave foránea por defecto en
+        # cada conexión (a diferencia de PostgreSQL/MySQL) — hay que
+        # activarlo explícitamente o el `ON DELETE RESTRICT` de
+        # ARCHITECTURE.md §6 queda declarado en el esquema pero sin efecto.
+        @event.listens_for(_engine, "connect")
+        def _enable_sqlite_foreign_keys(dbapi_connection: Any, connection_record: Any) -> None:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    # autoflush=True (el valor por defecto de SQLAlchemy): un repositorio que
+    # agrega una fila y luego, en la misma transacción, hace una consulta que
+    # depende de ella (ej. crear un RolePermission y a continuación leer los
+    # permisos del rol para construir el DTO de respuesta) debe ver esa fila
+    # sin tener que acordarse de llamar a `flush()` manualmente en cada sitio
+    # — desactivarlo cambia una clase entera de bugs silenciosos de
+    # "lectura después de escritura" por una ganancia de rendimiento marginal
+    # que no se ha medido como necesaria. Si algún caso puntual de escritura
+    # masiva lo necesitara, se desactiva localmente con `session.no_autoflush`.
+    _session_factory = sessionmaker(bind=_engine, expire_on_commit=False)
     return _engine
 
 
