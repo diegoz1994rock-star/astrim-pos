@@ -57,6 +57,7 @@ exclude = ["tests", "migrations"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 qt_api = "pyside6"
+pythonpath = ["src"]
 
 [tool.coverage.run]
 source = ["src/pos"]
