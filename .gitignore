@@ -1,0 +1,41 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Bases de datos locales de desarrollo
+*.db
+*.sqlite3
+!scripts/seed_demo_data.py
+
+# Configuración local sensible
+.env
+*.local.toml
+
+# Backups generados
+/backups_output/
+
+# Cobertura y cachés de herramientas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Empaquetado
+installer/output/
+*.exe
+*.msi
+
+# macOS
+.DS_Store
