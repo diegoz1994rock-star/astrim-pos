@@ -56,8 +56,8 @@ Antes de dar un módulo por terminado, según exige el spec:
 
 ## Testing
 
-- Todo caso de uso en `application/` tiene al menos una prueba unitaria con repositorios falsos en memoria.
-- Todo repositorio concreto en `infrastructure/` tiene al menos una prueba de integración contra SQLite real (en memoria).
+- Todo caso de uso en `application/` tiene al menos una prueba unitaria con repositorios falsos en memoria, **salvo** que su lógica sea mayormente orquestación transaccional sobre varias tablas (ej. `AuthenticationService`: contar intentos recientes, verificar credenciales, crear sesión, todo en una sola transacción) — en ese caso, una prueba de integración contra SQLite real cubre más riesgo real que un fake que reimplementaría la misma consulta. Se prefiere el fake cuando el caso de uso tiene una regla de negocio pura y aislable que vale la pena probar sin tocar disco.
+- Todo repositorio concreto en `infrastructure/` tiene al menos una prueba de integración contra SQLite real.
 - Los flujos críticos de UI (login, registrar una venta, cerrar caja) tienen al menos una prueba `pytest-qt`.
 
 ## Reevaluación de decisiones

@@ -6,9 +6,9 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 
 | Módulo | Carpeta | Depende de (vía eventos/dominio) | Estado |
 |---|---|---|---|
-| Configuración inicial / núcleo | `core/`, `modules/settings/` | — | pendiente |
-| Base de datos | `core/database/`, `migrations/` | — | pendiente |
-| Login / Autenticación | `modules/auth/` | users | pendiente |
+| Configuración inicial / núcleo | `core/`, `modules/settings/` | — | completo |
+| Base de datos | `core/database/`, `migrations/` | — | completo |
+| Login / Autenticación | `modules/auth/` | users, roles | completo |
 | Usuarios | `modules/users/` | roles | pendiente |
 | Roles y Permisos | `modules/roles/` | — | pendiente |
 | Clientes | `modules/customers/` | — | pendiente |

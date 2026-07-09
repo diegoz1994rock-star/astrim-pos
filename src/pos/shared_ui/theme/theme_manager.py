@@ -14,7 +14,6 @@ from pos.shared_ui.theme.tokens import DARK_THEME, LIGHT_THEME, ThemeTokens
 
 _QSS_TEMPLATE = """
 QWidget {{
-    background-color: {background};
     color: {text_primary};
     font-family: {font_family};
     font-size: {font_size_pt}pt;
