@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -36,6 +37,12 @@ from pos.core.security.session import ActiveSession, SessionManager
 from pos.modules.auth.application.authentication_service import AuthenticationService
 from pos.modules.auth.presentation.login_view import LoginView
 from pos.modules.auth.presentation.login_view_model import LoginViewModel
+from pos.modules.products.application.category_service import CategoryManagementService
+from pos.modules.products.application.product_service import ProductManagementService
+from pos.modules.products.presentation.categories_view import CategoriesView
+from pos.modules.products.presentation.categories_view_model import CategoriesViewModel
+from pos.modules.products.presentation.products_view import ProductsView
+from pos.modules.products.presentation.products_view_model import ProductsViewModel
 from pos.modules.roles.application.role_management_service import RoleManagementService
 from pos.modules.roles.presentation.roles_view import RolesView
 from pos.modules.roles.presentation.roles_view_model import RolesViewModel
@@ -45,7 +52,17 @@ from pos.modules.users.presentation.users_view import UsersView
 from pos.modules.users.presentation.users_view_model import UsersViewModel
 from pos.shared_ui.theme.theme_manager import ThemeManager
 
-_ADMIN_PERMISSION_CODE = "users.manage"
+
+@dataclass(frozen=True)
+class NavPanel:
+    """Un panel accesible desde la pantalla de bienvenida, visible solo si
+    la sesión activa tiene `permission_code`. Agregar un módulo nuevo con
+    pantalla propia es agregar una entrada aquí, no cablear un botón a mano
+    cada vez (ver `_build_nav_panels`)."""
+
+    label: str
+    permission_code: str
+    on_click: Callable[[], None]
 
 
 def bootstrap_core(container: Container) -> BootstrapConfig:
@@ -70,6 +87,10 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     )
     container.register_singleton(RoleManagementService, lambda: RoleManagementService(event_bus))
     container.register_singleton(UserManagementService, lambda: UserManagementService(event_bus))
+    container.register_singleton(CategoryManagementService, CategoryManagementService)
+    container.register_singleton(
+        ProductManagementService, lambda: ProductManagementService(event_bus)
+    )
     return config
 
 
@@ -85,35 +106,46 @@ def build_application() -> QApplication:
     return app
 
 
-def build_admin_widget(
-    user_service: UserManagementService,
-    role_service: RoleManagementService,
-    on_back: Callable[[], None],
-) -> QWidget:
-    """Panel de administración: pestañas de Usuarios y Roles/Permisos."""
+def _wrap_with_back_button(content: QWidget, on_back: Callable[[], None]) -> QWidget:
     widget = QWidget()
     layout = QVBoxLayout(widget)
-
     back_button = QPushButton("← Volver")
     back_button.clicked.connect(on_back)
     layout.addWidget(back_button)
+    layout.addWidget(content)
+    return widget
 
+
+def _build_admin_content(
+    user_service: UserManagementService, role_service: RoleManagementService
+) -> QWidget:
     tabs = QTabWidget()
     tabs.addTab(UsersView(UsersViewModel(user_service, role_service)), "Usuarios")
     tabs.addTab(RolesView(RolesViewModel(role_service)), "Roles y permisos")
-    layout.addWidget(tabs)
+    return tabs
 
-    return widget
+
+def _build_catalog_content(
+    product_service: ProductManagementService, category_service: CategoryManagementService
+) -> QWidget:
+    tabs = QTabWidget()
+    tabs.addTab(CategoriesView(CategoriesViewModel(category_service)), "Categorías")
+    tabs.addTab(
+        ProductsView(ProductsViewModel(product_service, category_service)), "Productos"
+    )
+    return tabs
 
 
 def build_welcome_widget(
     session: ActiveSession,
     on_logout: Callable[[], None],
-    on_open_admin: Callable[[], None] | None,
+    panels: list[NavPanel],
 ) -> QWidget:
-    """Pantalla mostrada tras un login exitoso: bienvenida + accesos según
-    el rol. El panel real por módulo de negocio (Ventas, Inventario, etc.)
-    se agrega en las siguientes etapas de desarrollo."""
+    """Pantalla mostrada tras un login exitoso: bienvenida + un botón por
+    cada `NavPanel` cuyo permiso tenga la sesión activa. El panel real por
+    módulo de negocio (Ventas, Inventario, etc.) se agrega en las
+    siguientes etapas de desarrollo, cada uno como una entrada nueva en
+    `_build_nav_panels`."""
     outer_layout = QVBoxLayout()
     outer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -128,10 +160,11 @@ def build_welcome_widget(
     welcome_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     card_layout.addWidget(welcome_label)
 
-    if on_open_admin is not None:
-        admin_button = QPushButton("Administración")
-        admin_button.clicked.connect(on_open_admin)
-        card_layout.addWidget(admin_button)
+    for panel in panels:
+        if session.has_permission(panel.permission_code):
+            button = QPushButton(panel.label)
+            button.clicked.connect(panel.on_click)
+            card_layout.addWidget(button)
 
     logout_button = QPushButton("Cerrar sesión")
     logout_button.clicked.connect(on_logout)
@@ -149,6 +182,8 @@ def build_main_window(
     auth_service: AuthenticationService,
     user_service: UserManagementService,
     role_service: RoleManagementService,
+    product_service: ProductManagementService,
+    category_service: CategoryManagementService,
 ) -> QMainWindow:
     """Construye la ventana principal: arranca mostrando el login y, tras
     autenticar, cambia al contenido de la aplicación."""
@@ -167,19 +202,26 @@ def build_main_window(
             auth_service.logout()
             show_login()
 
-        def open_admin() -> None:
+        def open_panel(build_content: Callable[[], QWidget]) -> None:
             window.setCentralWidget(
-                build_admin_widget(
-                    user_service, role_service, on_back=lambda: show_welcome(session)
-                )
+                _wrap_with_back_button(build_content(), on_back=lambda: show_welcome(session))
             )
 
-        can_administer = session.has_permission(_ADMIN_PERMISSION_CODE)
-        window.setCentralWidget(
-            build_welcome_widget(
-                session, handle_logout, open_admin if can_administer else None
-            )
-        )
+        panels = [
+            NavPanel(
+                "Administración",
+                "users.manage",
+                lambda: open_panel(lambda: _build_admin_content(user_service, role_service)),
+            ),
+            NavPanel(
+                "Catálogo",
+                "products.manage",
+                lambda: open_panel(
+                    lambda: _build_catalog_content(product_service, category_service)
+                ),
+            ),
+        ]
+        window.setCentralWidget(build_welcome_widget(session, handle_logout, panels))
 
     show_login()
     return window
@@ -197,7 +239,11 @@ def main() -> int:
     auth_service = container.resolve(AuthenticationService)
     user_service = container.resolve(UserManagementService)
     role_service = container.resolve(RoleManagementService)
-    window = build_main_window(theme_manager, auth_service, user_service, role_service)
+    product_service = container.resolve(ProductManagementService)
+    category_service = container.resolve(CategoryManagementService)
+    window = build_main_window(
+        theme_manager, auth_service, user_service, role_service, product_service, category_service
+    )
     window.show()
     return app.exec()
 

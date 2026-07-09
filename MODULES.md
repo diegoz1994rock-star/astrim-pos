@@ -13,7 +13,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Roles y Permisos | `modules/roles/` | — | completo |
 | Clientes | `modules/customers/` | — | pendiente |
 | Proveedores | `modules/suppliers/` | — | pendiente |
-| Productos y Categorías | `modules/products/` | inventory (stock) | pendiente |
+| Productos y Categorías | `modules/products/` | inventory (stock) | completo |
 | Inventario | `modules/inventory/` | products | pendiente |
 | Compras | `modules/purchasing/` | products, inventory, suppliers | pendiente |
 | Ventas | `modules/sales/` | products, inventory, customers, cash_register | pendiente |
