@@ -38,6 +38,7 @@ SYSTEM_PERMISSIONS: list[str] = [
     "licensing.manage",
     "backups.manage",
     "sync.manage",
+    "promotions.manage",
 ]
 
 _ADMIN_ROLE_NAME = "Administrador General"

@@ -12,6 +12,8 @@ from pos.modules.cash_register.application.cash_register_service import CashRegi
 from pos.modules.customers.application.customer_service import CustomerManagementService
 from pos.modules.inventory.application.inventory_service import InventoryService
 from pos.modules.products.application.product_service import ProductManagementService
+from pos.modules.promotions.application.dto import AppliedDiscountDTO
+from pos.modules.promotions.application.promotion_service import PromotionService
 from pos.modules.sales.application.dto import (
     SaleItemInput,
     SalePaymentInput,
@@ -41,6 +43,7 @@ class SaleViewModel(QObject):
         customer_service: CustomerManagementService,
         inventory_service: InventoryService,
         cash_register_service: CashRegisterService,
+        promotion_service: PromotionService,
         session_manager: SessionManager,
         parent: QObject | None = None,
     ) -> None:
@@ -50,18 +53,37 @@ class SaleViewModel(QObject):
         self._customer_service = customer_service
         self._inventory_service = inventory_service
         self._cash_register_service = cash_register_service
+        self._promotion_service = promotion_service
         self._session_manager = session_manager
 
         self._items: list[SaleItemInput] = []
         self._payments: list[SalePaymentInput] = []
         self._customer_id: int | None = None
+        self._applied_discounts: list[AppliedDiscountDTO] = []
 
     def load(self) -> None:
         self.products_loaded.emit(self._product_service.list_products())
         self.customers_loaded.emit(self._customer_service.list_customers())
         self._refresh_preview()
 
+    def _apply_automatic_discounts(self) -> None:
+        """Recalcula los descuentos automáticos de promociones activas
+        (ARCHITECTURE.md, módulo de Promociones) para el carrito actual y
+        reescribe `discount_amount` de cada línea en consecuencia."""
+        lines = [(item.product_id, item.quantity) for item in self._items]
+        self._applied_discounts = self._promotion_service.compute_discounts(lines)
+        discounts_by_product = {d.product_id: d.amount for d in self._applied_discounts}
+        self._items = [
+            SaleItemInput(
+                product_id=item.product_id,
+                quantity=item.quantity,
+                discount_amount=discounts_by_product.get(item.product_id, Decimal(0)),
+            )
+            for item in self._items
+        ]
+
     def _refresh_preview(self) -> None:
+        self._apply_automatic_discounts()
         try:
             preview = self._sales_service.preview_sale(self._items)
         except DomainError as error:
@@ -129,8 +151,16 @@ class SaleViewModel(QObject):
         except DomainError as error:
             self.error_occurred.emit(str(error))
         else:
+            if self._applied_discounts:
+                sale_item_ids_by_product = {item.product_id: item.id for item in sale.items}
+                self._promotion_service.record_applied_discounts(
+                    sale_id=sale.id,
+                    sale_item_ids_by_product=sale_item_ids_by_product,
+                    discounts=self._applied_discounts,
+                )
             self._items = []
             self._payments = []
             self._customer_id = None
+            self._applied_discounts = []
             self.sale_completed.emit(sale)
             self._refresh_preview()

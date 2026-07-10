@@ -66,6 +66,9 @@ from pos.modules.products.presentation.categories_view import CategoriesView
 from pos.modules.products.presentation.categories_view_model import CategoriesViewModel
 from pos.modules.products.presentation.products_view import ProductsView
 from pos.modules.products.presentation.products_view_model import ProductsViewModel
+from pos.modules.promotions.application.promotion_service import PromotionService
+from pos.modules.promotions.presentation.promotions_view import PromotionsView
+from pos.modules.promotions.presentation.promotions_view_model import PromotionsViewModel
 from pos.modules.reports.application.reports_service import ReportsService
 from pos.modules.reports.presentation.reports_view import ReportsView
 from pos.modules.reports.presentation.reports_view_model import ReportsViewModel
@@ -139,6 +142,7 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     container.register_singleton(InventoryService, lambda: InventoryService(event_bus))
     container.register_singleton(CustomerManagementService, CustomerManagementService)
     container.register_singleton(SupplierManagementService, SupplierManagementService)
+    container.register_singleton(PromotionService, PromotionService)
     container.register_singleton(
         CashRegisterService, lambda: CashRegisterService(event_bus)
     )
@@ -230,6 +234,11 @@ def _build_inventory_content(container: Container) -> QWidget:
     return InventoryView(InventoryViewModel(inventory_service, product_service))
 
 
+def _build_promotions_content(container: Container) -> QWidget:
+    promotion_service = container.resolve(PromotionService)
+    return PromotionsView(PromotionsViewModel(promotion_service))
+
+
 def _build_cash_register_content(container: Container) -> QWidget:
     cash_register_service = container.resolve(CashRegisterService)
     session_manager = container.resolve(SessionManager)
@@ -242,6 +251,7 @@ def _build_sales_content(container: Container) -> QWidget:
     customer_service = container.resolve(CustomerManagementService)
     inventory_service = container.resolve(InventoryService)
     cash_register_service = container.resolve(CashRegisterService)
+    promotion_service = container.resolve(PromotionService)
     session_manager = container.resolve(SessionManager)
 
     tabs = QTabWidget()
@@ -253,6 +263,7 @@ def _build_sales_content(container: Container) -> QWidget:
                 customer_service,
                 inventory_service,
                 cash_register_service,
+                promotion_service,
                 session_manager,
             )
         ),
@@ -304,6 +315,9 @@ def _build_nav_panels(
     return [
         NavPanel("Administración", "users.manage", lambda: open_panel(_build_admin_content)),
         NavPanel("Catálogo", "products.manage", lambda: open_panel(_build_catalog_content)),
+        NavPanel(
+            "Promociones", "promotions.manage", lambda: open_panel(_build_promotions_content)
+        ),
         NavPanel(
             "Inventario", "inventory.manage", lambda: open_panel(_build_inventory_content)
         ),

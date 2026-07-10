@@ -16,12 +16,12 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Productos y Categorías | `modules/products/` | inventory (stock) | completo |
 | Inventario | `modules/inventory/` | products | completo |
 | Compras | `modules/purchasing/` | products, inventory, suppliers | pendiente |
-| Ventas | `modules/sales/` | products, inventory, customers, cash_register | completo |
+| Ventas | `modules/sales/` | products, inventory, customers, cash_register, promotions (solo presentación, ver descripción) | completo |
 | Facturación / Impuestos | `modules/billing/` | sales, settings | pendiente |
 | Caja | `modules/cash_register/` | — | completo |
 | Mesas y Pedidos (Restaurante) | `modules/restaurant/` | sales, kitchen | pendiente |
 | Cocina | `modules/kitchen/` | restaurant | pendiente |
-| Promociones y Descuentos | `modules/promotions/` | products, sales | pendiente |
+| Promociones y Descuentos | `modules/promotions/` | products | completo |
 | Reportes | `modules/reports/` | sales, inventory, cash_register, customers, users, billing | completo (parcial: ventas/productos/inventario/caja; clientes/usuarios/impuestos/ganancias pendientes) |
 | Configuración (panel admin) | `modules/settings/` | — | pendiente |
 | Licencias | `modules/licensing/` | — | completo |
@@ -64,7 +64,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 
 **Cocina** — Pantalla independiente (KDS) con pedidos entrantes automáticos y estados (pendiente/preparando/listo/entregado), notificación al mesero.
 
-**Promociones y Descuentos** — Reglas de promoción configurables (por producto, categoría, combo, fecha/hora) sin tocar código.
+**Promociones y Descuentos** — Reglas de promoción configurables desde la UI (por producto, categoría, combo, cantidad mínima, día de la semana, horario) sin tocar código. `PromotionService.compute_discounts` calcula automáticamente los descuentos aplicables al carrito; si varias promociones aplican a la misma línea se usa la de mayor descuento (no se acumulan, evita descuentos compuestos inesperados). Compuesto en `SaleViewModel` (capa de presentación, no `SalesService` — mantiene `sales` sin una dependencia de aplicación hacia `promotions`, mismo patrón que otras composiciones en `main.py`): el carrito recalcula descuentos automáticos en cada cambio, y una vez la venta se completa se registra el rastro de auditoría en `discounts_applied` (congelado aunque la promoción se edite después).
 
 **Reportes** — Ventas, ganancias/pérdidas, inventario, productos, clientes, usuarios, impuestos, caja, estadísticas; exportables a PDF y Excel.
 
