@@ -18,7 +18,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Compras | `modules/purchasing/` | products, inventory, suppliers | pendiente |
 | Ventas | `modules/sales/` | products, inventory, customers, cash_register | pendiente |
 | Facturación / Impuestos | `modules/billing/` | sales, settings | pendiente |
-| Caja | `modules/cash_register/` | sales | pendiente |
+| Caja | `modules/cash_register/` | — | completo |
 | Mesas y Pedidos (Restaurante) | `modules/restaurant/` | sales, kitchen | pendiente |
 | Cocina | `modules/kitchen/` | restaurant | pendiente |
 | Promociones y Descuentos | `modules/promotions/` | products, sales | pendiente |

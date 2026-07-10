@@ -37,6 +37,11 @@ from pos.core.security.session import ActiveSession, SessionManager
 from pos.modules.auth.application.authentication_service import AuthenticationService
 from pos.modules.auth.presentation.login_view import LoginView
 from pos.modules.auth.presentation.login_view_model import LoginViewModel
+from pos.modules.cash_register.application.cash_register_service import CashRegisterService
+from pos.modules.cash_register.presentation.cash_register_view import CashRegisterView
+from pos.modules.cash_register.presentation.cash_register_view_model import (
+    CashRegisterViewModel,
+)
 from pos.modules.customers.application.customer_service import CustomerManagementService
 from pos.modules.customers.presentation.customers_view import CustomersView
 from pos.modules.customers.presentation.customers_view_model import CustomersViewModel
@@ -109,6 +114,9 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     container.register_singleton(InventoryService, lambda: InventoryService(event_bus))
     container.register_singleton(CustomerManagementService, CustomerManagementService)
     container.register_singleton(SupplierManagementService, SupplierManagementService)
+    container.register_singleton(
+        CashRegisterService, lambda: CashRegisterService(event_bus)
+    )
 
     # Registro de manejadores de eventos entre módulos (ver ARCHITECTURE.md
     # §5): Inventario reacciona a que Productos publique un producto nuevo.
@@ -166,6 +174,12 @@ def _build_inventory_content(container: Container) -> QWidget:
     return InventoryView(InventoryViewModel(inventory_service, product_service))
 
 
+def _build_cash_register_content(container: Container) -> QWidget:
+    cash_register_service = container.resolve(CashRegisterService)
+    session_manager = container.resolve(SessionManager)
+    return CashRegisterView(CashRegisterViewModel(cash_register_service, session_manager))
+
+
 def _build_third_parties_content(container: Container) -> QWidget:
     customer_service = container.resolve(CustomerManagementService)
     supplier_service = container.resolve(SupplierManagementService)
@@ -190,6 +204,9 @@ def _build_nav_panels(
             "Clientes y Proveedores",
             "customers.manage",
             lambda: open_panel(_build_third_parties_content),
+        ),
+        NavPanel(
+            "Caja", "cash_register.manage", lambda: open_panel(_build_cash_register_content)
         ),
     ]
 

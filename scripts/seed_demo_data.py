@@ -19,6 +19,7 @@ from argon2 import PasswordHasher
 from sqlalchemy import select
 
 from pos.core.database.session import init_engine, session_scope
+from pos.modules.cash_register.infrastructure.models import CashRegister
 from pos.modules.inventory.infrastructure.models import Warehouse
 from pos.modules.products.infrastructure.models import Tax
 from pos.modules.roles.infrastructure.models import Permission, Role, RolePermission
@@ -95,6 +96,12 @@ def seed(database_url: str) -> None:
 
         if session.scalar(select(Warehouse).where(Warehouse.name == "Bodega Principal")) is None:
             session.add(Warehouse(name="Bodega Principal"))
+
+        existing_register = session.scalar(
+            select(CashRegister).where(CashRegister.name == "Caja Principal")
+        )
+        if existing_register is None:
+            session.add(CashRegister(name="Caja Principal"))
 
         if session.scalar(select(Tax).where(Tax.name == "IVA")) is None:
             session.add(Tax(name="IVA", rate_percent=19))
