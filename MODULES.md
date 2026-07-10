@@ -19,8 +19,8 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Ventas | `modules/sales/` | products, inventory, customers, cash_register, promotions (solo presentación, ver descripción) | completo |
 | Facturación / Impuestos | `modules/billing/` | sales, settings | pendiente |
 | Caja | `modules/cash_register/` | — | completo |
-| Mesas y Pedidos (Restaurante) | `modules/restaurant/` | sales, kitchen | pendiente |
-| Cocina | `modules/kitchen/` | restaurant | pendiente |
+| Mesas y Pedidos (Restaurante) | `modules/restaurant/` | products (solo lectura) | completo (conversión de mesa a Venta real queda pendiente, ver descripción) |
+| Cocina | `modules/kitchen/` | restaurant, products (solo lectura) | completo |
 | Promociones y Descuentos | `modules/promotions/` | products | completo |
 | Reportes | `modules/reports/` | sales, inventory, cash_register, customers, users, billing | completo (parcial: ventas/productos/inventario/caja; clientes/usuarios/impuestos/ganancias pendientes) |
 | Configuración (panel admin) | `modules/settings/` | — | pendiente |
@@ -60,9 +60,9 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 
 **Caja** — Apertura y cierre de caja, arqueos, movimientos de efectivo (ingresos/egresos manuales), cuadre.
 
-**Mesas y Pedidos (Restaurante)** — Administración de mesas, estados, división de cuentas, unión de mesas, pedidos para llevar/domicilio/rápidos.
+**Mesas y Pedidos (Restaurante)** — `RestaurantService`: mesas (estado libre/ocupada/reservada), sesiones de mesa (abrir bloquea la mesa, cerrar la libera), pedidos con canal (`dine_in`/`takeaway`/`delivery`/`quick` — solo `dine_in` exige una sesión de mesa abierta). Fuera de alcance a propósito, documentado en el docstring de `restaurant_service.py`: convertir los pedidos de una mesa cerrada en una `Sale` real de Ventas ("cobro de mesa") — `Order`/`OrderItem` hoy no llevan precio/impuesto por línea (vive en `sales.SaleItem`), así que ese paso necesita su propio diseño de conciliación de precios. División de cuentas y unión de mesas (`BillSplit`, esquema ya listo desde M2) tampoco implementadas todavía.
 
-**Cocina** — Pantalla independiente (KDS) con pedidos entrantes automáticos y estados (pendiente/preparando/listo/entregado), notificación al mesero.
+**Cocina** — Sin esquema propio: es una vista especializada (KDS) sobre `restaurant.OrderItem` (`modules/kitchen/infrastructure` vacío a propósito). `KitchenService.list_queue()` muestra todo ítem no entregado con su contexto (mesa, tipo de pedido); `advance_item` avanza la secuencia pendiente → preparando → listo → entregado, sin poder saltar pasos ni retroceder, registrando el historial de tiempos en `order_item_status_history`. El panel se refresca solo cada 5s (`QTimer`, mismo patrón que Sincronización).
 
 **Promociones y Descuentos** — Reglas de promoción configurables desde la UI (por producto, categoría, combo, cantidad mínima, día de la semana, horario) sin tocar código. `PromotionService.compute_discounts` calcula automáticamente los descuentos aplicables al carrito; si varias promociones aplican a la misma línea se usa la de mayor descuento (no se acumulan, evita descuentos compuestos inesperados). Compuesto en `SaleViewModel` (capa de presentación, no `SalesService` — mantiene `sales` sin una dependencia de aplicación hacia `promotions`, mismo patrón que otras composiciones en `main.py`): el carrito recalcula descuentos automáticos en cada cambio, y una vez la venta se completa se registra el rastro de auditoría en `discounts_applied` (congelado aunque la promoción se edite después).
 

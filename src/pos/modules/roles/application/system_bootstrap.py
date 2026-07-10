@@ -39,6 +39,8 @@ SYSTEM_PERMISSIONS: list[str] = [
     "backups.manage",
     "sync.manage",
     "promotions.manage",
+    "restaurant.manage",
+    "kitchen.manage",
 ]
 
 _ADMIN_ROLE_NAME = "Administrador General"

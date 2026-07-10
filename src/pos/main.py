@@ -54,6 +54,9 @@ from pos.modules.inventory.application.event_handlers import InventoryProductEve
 from pos.modules.inventory.application.inventory_service import InventoryService
 from pos.modules.inventory.presentation.inventory_view import InventoryView
 from pos.modules.inventory.presentation.inventory_view_model import InventoryViewModel
+from pos.modules.kitchen.application.kitchen_service import KitchenService
+from pos.modules.kitchen.presentation.kitchen_view import KitchenView
+from pos.modules.kitchen.presentation.kitchen_view_model import KitchenViewModel
 from pos.modules.licensing.application.license_service import LicenseService
 from pos.modules.licensing.domain.enums import LicenseVerificationResult
 from pos.modules.licensing.infrastructure.embedded_public_key import VENDOR_PUBLIC_KEY_B64
@@ -72,6 +75,9 @@ from pos.modules.promotions.presentation.promotions_view_model import Promotions
 from pos.modules.reports.application.reports_service import ReportsService
 from pos.modules.reports.presentation.reports_view import ReportsView
 from pos.modules.reports.presentation.reports_view_model import ReportsViewModel
+from pos.modules.restaurant.application.restaurant_service import RestaurantService
+from pos.modules.restaurant.presentation.restaurant_view import RestaurantView
+from pos.modules.restaurant.presentation.restaurant_view_model import RestaurantViewModel
 from pos.modules.roles.application.role_management_service import RoleManagementService
 from pos.modules.roles.presentation.roles_view import RolesView
 from pos.modules.roles.presentation.roles_view_model import RolesViewModel
@@ -143,6 +149,8 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     container.register_singleton(CustomerManagementService, CustomerManagementService)
     container.register_singleton(SupplierManagementService, SupplierManagementService)
     container.register_singleton(PromotionService, PromotionService)
+    container.register_singleton(RestaurantService, RestaurantService)
+    container.register_singleton(KitchenService, KitchenService)
     container.register_singleton(
         CashRegisterService, lambda: CashRegisterService(event_bus)
     )
@@ -239,6 +247,21 @@ def _build_promotions_content(container: Container) -> QWidget:
     return PromotionsView(PromotionsViewModel(promotion_service))
 
 
+def _build_restaurant_content(container: Container) -> QWidget:
+    restaurant_service = container.resolve(RestaurantService)
+    product_service = container.resolve(ProductManagementService)
+    session_manager = container.resolve(SessionManager)
+    return RestaurantView(
+        RestaurantViewModel(restaurant_service, product_service, session_manager)
+    )
+
+
+def _build_kitchen_content(container: Container) -> QWidget:
+    kitchen_service = container.resolve(KitchenService)
+    session_manager = container.resolve(SessionManager)
+    return KitchenView(KitchenViewModel(kitchen_service, session_manager))
+
+
 def _build_cash_register_content(container: Container) -> QWidget:
     cash_register_service = container.resolve(CashRegisterService)
     session_manager = container.resolve(SessionManager)
@@ -318,6 +341,10 @@ def _build_nav_panels(
         NavPanel(
             "Promociones", "promotions.manage", lambda: open_panel(_build_promotions_content)
         ),
+        NavPanel(
+            "Restaurante", "restaurant.manage", lambda: open_panel(_build_restaurant_content)
+        ),
+        NavPanel("Cocina", "kitchen.manage", lambda: open_panel(_build_kitchen_content)),
         NavPanel(
             "Inventario", "inventory.manage", lambda: open_panel(_build_inventory_content)
         ),

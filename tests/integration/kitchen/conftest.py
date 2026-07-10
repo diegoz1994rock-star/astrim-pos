@@ -1,0 +1,54 @@
+"""Fixtures de integración para Cocina: SQLite real con esquema completo,
+un mesero y un producto base para poder crear pedidos de prueba."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from dataclasses import dataclass
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+import pos.core.database.session as session_module
+from pos.core.database import model_registry
+from pos.core.database.session import init_engine, session_scope
+from pos.modules.products.infrastructure.models import Product
+from pos.modules.roles.infrastructure.models import Role
+from pos.modules.users.infrastructure.models import User
+
+
+@pytest.fixture
+def sqlite_engine(tmp_path: Path) -> Iterator[None]:
+    db_path = tmp_path / "test.db"
+    engine = init_engine(f"sqlite:///{db_path}")
+    model_registry.metadata.create_all(engine)
+    yield
+    session_module._engine = None
+    session_module._session_factory = None
+
+
+@dataclass(frozen=True)
+class KitchenFixture:
+    waiter_user_id: int
+    product_id: int
+
+
+@pytest.fixture
+def kitchen_env(sqlite_engine: None) -> KitchenFixture:
+    with session_scope() as session:
+        role = Role(name="Mesero", is_system_role=True)
+        session.add(role)
+        session.flush()
+        user = User(
+            username="mesero1",
+            password_hash="x",
+            full_name="Mesero Uno",
+            role_id=role.id,
+            is_active=True,
+        )
+        session.add(user)
+        product = Product(sku="PLATO-1", name="Plato del día", unit_price=Decimal("15000"))
+        session.add(product)
+        session.flush()
+        return KitchenFixture(waiter_user_id=user.id, product_id=product.id)
