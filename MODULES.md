@@ -14,7 +14,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Clientes | `modules/customers/` | — | pendiente |
 | Proveedores | `modules/suppliers/` | — | pendiente |
 | Productos y Categorías | `modules/products/` | inventory (stock) | completo |
-| Inventario | `modules/inventory/` | products | pendiente |
+| Inventario | `modules/inventory/` | products | completo |
 | Compras | `modules/purchasing/` | products, inventory, suppliers | pendiente |
 | Ventas | `modules/sales/` | products, inventory, customers, cash_register | pendiente |
 | Facturación / Impuestos | `modules/billing/` | sales, settings | pendiente |

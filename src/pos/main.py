@@ -37,8 +37,13 @@ from pos.core.security.session import ActiveSession, SessionManager
 from pos.modules.auth.application.authentication_service import AuthenticationService
 from pos.modules.auth.presentation.login_view import LoginView
 from pos.modules.auth.presentation.login_view_model import LoginViewModel
+from pos.modules.inventory.application.event_handlers import InventoryProductEventHandlers
+from pos.modules.inventory.application.inventory_service import InventoryService
+from pos.modules.inventory.presentation.inventory_view import InventoryView
+from pos.modules.inventory.presentation.inventory_view_model import InventoryViewModel
 from pos.modules.products.application.category_service import CategoryManagementService
 from pos.modules.products.application.product_service import ProductManagementService
+from pos.modules.products.domain.events import ProductCreatedEvent
 from pos.modules.products.presentation.categories_view import CategoriesView
 from pos.modules.products.presentation.categories_view_model import CategoriesViewModel
 from pos.modules.products.presentation.products_view import ProductsView
@@ -57,8 +62,8 @@ from pos.shared_ui.theme.theme_manager import ThemeManager
 class NavPanel:
     """Un panel accesible desde la pantalla de bienvenida, visible solo si
     la sesión activa tiene `permission_code`. Agregar un módulo nuevo con
-    pantalla propia es agregar una entrada aquí, no cablear un botón a mano
-    cada vez (ver `_build_nav_panels`)."""
+    pantalla propia es agregar una entrada a `_build_nav_panels`, no cablear
+    un botón a mano cada vez."""
 
     label: str
     permission_code: str
@@ -66,10 +71,14 @@ class NavPanel:
 
 
 def bootstrap_core(container: Container) -> BootstrapConfig:
-    """Inicializa logging, el engine de base de datos y registra los
-    servicios transversales del núcleo en el contenedor de DI.
+    """Inicializa logging, el engine de base de datos, registra los
+    servicios de todos los módulos en el contenedor de DI y conecta los
+    manejadores de eventos entre módulos.
 
     Debe ejecutarse una única vez, antes de construir cualquier ventana.
+    Cualquier servicio de aplicación nuevo se registra aquí; `build_main_window`
+    y las funciones `_build_*_content` lo resuelven desde `container`, sin
+    que cada función nueva tenga que agregar un parámetro más a su firma.
     """
     config = load_bootstrap_config()
     setup_logging(config.log_dir, level=_parse_log_level(config.log_level))
@@ -91,6 +100,13 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     container.register_singleton(
         ProductManagementService, lambda: ProductManagementService(event_bus)
     )
+    container.register_singleton(InventoryService, lambda: InventoryService(event_bus))
+
+    # Registro de manejadores de eventos entre módulos (ver ARCHITECTURE.md
+    # §5): Inventario reacciona a que Productos publique un producto nuevo.
+    inventory_handlers = InventoryProductEventHandlers(container.resolve(InventoryService))
+    event_bus.subscribe(ProductCreatedEvent, inventory_handlers.on_product_created)
+
     return config
 
 
@@ -116,18 +132,18 @@ def _wrap_with_back_button(content: QWidget, on_back: Callable[[], None]) -> QWi
     return widget
 
 
-def _build_admin_content(
-    user_service: UserManagementService, role_service: RoleManagementService
-) -> QWidget:
+def _build_admin_content(container: Container) -> QWidget:
+    user_service = container.resolve(UserManagementService)
+    role_service = container.resolve(RoleManagementService)
     tabs = QTabWidget()
     tabs.addTab(UsersView(UsersViewModel(user_service, role_service)), "Usuarios")
     tabs.addTab(RolesView(RolesViewModel(role_service)), "Roles y permisos")
     return tabs
 
 
-def _build_catalog_content(
-    product_service: ProductManagementService, category_service: CategoryManagementService
-) -> QWidget:
+def _build_catalog_content(container: Container) -> QWidget:
+    product_service = container.resolve(ProductManagementService)
+    category_service = container.resolve(CategoryManagementService)
     tabs = QTabWidget()
     tabs.addTab(CategoriesView(CategoriesViewModel(category_service)), "Categorías")
     tabs.addTab(
@@ -136,16 +152,33 @@ def _build_catalog_content(
     return tabs
 
 
+def _build_inventory_content(container: Container) -> QWidget:
+    inventory_service = container.resolve(InventoryService)
+    product_service = container.resolve(ProductManagementService)
+    return InventoryView(InventoryViewModel(inventory_service, product_service))
+
+
+def _build_nav_panels(
+    container: Container, open_panel: Callable[[Callable[[Container], QWidget]], None]
+) -> list[NavPanel]:
+    """Catálogo de paneles disponibles desde la pantalla de bienvenida.
+    Agregar un módulo nuevo con pantalla propia es agregar una línea aquí."""
+    return [
+        NavPanel("Administración", "users.manage", lambda: open_panel(_build_admin_content)),
+        NavPanel("Catálogo", "products.manage", lambda: open_panel(_build_catalog_content)),
+        NavPanel(
+            "Inventario", "inventory.manage", lambda: open_panel(_build_inventory_content)
+        ),
+    ]
+
+
 def build_welcome_widget(
     session: ActiveSession,
     on_logout: Callable[[], None],
     panels: list[NavPanel],
 ) -> QWidget:
     """Pantalla mostrada tras un login exitoso: bienvenida + un botón por
-    cada `NavPanel` cuyo permiso tenga la sesión activa. El panel real por
-    módulo de negocio (Ventas, Inventario, etc.) se agrega en las
-    siguientes etapas de desarrollo, cada uno como una entrada nueva en
-    `_build_nav_panels`."""
+    cada `NavPanel` cuyo permiso tenga la sesión activa."""
     outer_layout = QVBoxLayout()
     outer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -177,20 +210,14 @@ def build_welcome_widget(
     return widget
 
 
-def build_main_window(
-    theme_manager: ThemeManager,
-    auth_service: AuthenticationService,
-    user_service: UserManagementService,
-    role_service: RoleManagementService,
-    product_service: ProductManagementService,
-    category_service: CategoryManagementService,
-) -> QMainWindow:
+def build_main_window(theme_manager: ThemeManager, container: Container) -> QMainWindow:
     """Construye la ventana principal: arranca mostrando el login y, tras
     autenticar, cambia al contenido de la aplicación."""
     theme_manager.apply_light()
     window = QMainWindow()
     window.setWindowTitle("Sistema POS")
     window.resize(1280, 800)
+    auth_service = container.resolve(AuthenticationService)
 
     def show_login() -> None:
         login_view = LoginView(LoginViewModel(auth_service))
@@ -202,25 +229,14 @@ def build_main_window(
             auth_service.logout()
             show_login()
 
-        def open_panel(build_content: Callable[[], QWidget]) -> None:
+        def open_panel(build_content: Callable[[Container], QWidget]) -> None:
             window.setCentralWidget(
-                _wrap_with_back_button(build_content(), on_back=lambda: show_welcome(session))
+                _wrap_with_back_button(
+                    build_content(container), on_back=lambda: show_welcome(session)
+                )
             )
 
-        panels = [
-            NavPanel(
-                "Administración",
-                "users.manage",
-                lambda: open_panel(lambda: _build_admin_content(user_service, role_service)),
-            ),
-            NavPanel(
-                "Catálogo",
-                "products.manage",
-                lambda: open_panel(
-                    lambda: _build_catalog_content(product_service, category_service)
-                ),
-            ),
-        ]
+        panels = _build_nav_panels(container, open_panel)
         window.setCentralWidget(build_welcome_widget(session, handle_logout, panels))
 
     show_login()
@@ -236,14 +252,7 @@ def main() -> int:
     theme_manager = ThemeManager(app)
     container.register_instance(ThemeManager, theme_manager)
 
-    auth_service = container.resolve(AuthenticationService)
-    user_service = container.resolve(UserManagementService)
-    role_service = container.resolve(RoleManagementService)
-    product_service = container.resolve(ProductManagementService)
-    category_service = container.resolve(CategoryManagementService)
-    window = build_main_window(
-        theme_manager, auth_service, user_service, role_service, product_service, category_service
-    )
+    window = build_main_window(theme_manager, container)
     window.show()
     return app.exec()
 
