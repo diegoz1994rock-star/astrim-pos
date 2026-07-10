@@ -66,3 +66,34 @@ def test_handlers_of_other_event_types_are_not_invoked() -> None:
     bus.publish(_OtherEvent())
 
     assert received == []
+
+
+def test_global_subscriber_receives_every_event_type() -> None:
+    bus = EventBus()
+
+    @dataclass(frozen=True, kw_only=True)
+    class _OtherEvent(DomainEvent):
+        pass
+
+    received: list[DomainEvent] = []
+    bus.subscribe_all(received.append)
+
+    bus.publish(_SampleEvent(payload="hola"))
+    bus.publish(_OtherEvent())
+
+    assert len(received) == 2
+
+
+def test_global_subscriber_exception_does_not_stop_typed_handlers() -> None:
+    bus = EventBus()
+    received: list[str] = []
+
+    def failing_global_handler(event: DomainEvent) -> None:
+        raise RuntimeError("fallo simulado")
+
+    bus.subscribe(_SampleEvent, lambda event: received.append(event.payload))
+    bus.subscribe_all(failing_global_handler)
+
+    bus.publish(_SampleEvent(payload="hola"))
+
+    assert received == ["hola"]

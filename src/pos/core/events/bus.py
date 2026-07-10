@@ -31,11 +31,23 @@ class EventBus:
 
     def __init__(self) -> None:
         self._handlers: dict[type[DomainEvent], list[EventHandler]] = defaultdict(list)
+        self._global_handlers: list[EventHandler] = []
 
     def subscribe(self, event_type: type[EventT], handler: Callable[[EventT], None]) -> None:
         """Registra `handler` para que se invoque cada vez que se publique
         un evento de tipo `event_type` (o una subclase exacta registrada)."""
         self._handlers[event_type].append(handler)  # type: ignore[arg-type]
+
+    def subscribe_all(self, handler: EventHandler) -> None:
+        """Registra `handler` para que se invoque con TODO evento publicado,
+        sin importar su tipo.
+
+        Punto de extensión pensado para el módulo de Sincronización
+        (ARCHITECTURE.md §10): captura cada evento de dominio como entrada
+        de outbox sin que cada módulo nuevo tenga que agregar a mano una
+        suscripción de sync además de sus suscripciones de negocio.
+        """
+        self._global_handlers.append(handler)
 
     def unsubscribe(self, event_type: type[EventT], handler: Callable[[EventT], None]) -> None:
         """Elimina una suscripción previamente registrada."""
@@ -44,12 +56,13 @@ class EventBus:
             handlers.remove(handler)
 
     def publish(self, event: DomainEvent) -> None:
-        """Despacha `event` a todos los suscriptores de su tipo exacto.
+        """Despacha `event` a todos los suscriptores de su tipo exacto y a
+        los suscriptores globales (`subscribe_all`).
 
         Un manejador que lance una excepción no detiene a los demás
         manejadores ni al publicador; se registra en el log de errores.
         """
-        for handler in self._handlers.get(type(event), []):
+        for handler in [*self._handlers.get(type(event), []), *self._global_handlers]:
             try:
                 handler(event)
             except Exception:

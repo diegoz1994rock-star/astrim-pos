@@ -27,6 +27,12 @@ class SyncStation(Base, TimestampMixin):
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     """Solo una estación de la red debe tener `is_primary=True` a la vez."""
 
+    is_local: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    """Marca la única fila que representa a esta estación (la que ejecuta
+    este proceso), a diferencia de las demás filas que son pares remotos
+    conocidos. No se identifica por nombre (el nombre es editable desde la
+    UI) para poder renombrarla sin crear una fila duplicada."""
+
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     status: Mapped[SyncStationStatus] = mapped_column(
         Enum(SyncStationStatus, native_enum=False),

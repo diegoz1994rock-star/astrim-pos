@@ -28,7 +28,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Backups | `modules/backups/` | — | completo |
 | Auditoría | `modules/audit/` | todos (suscriptor de eventos) | pendiente |
 | Notificaciones | `modules/notifications/` | kitchen, inventory, licensing | pendiente |
-| Sincronización / Servidor | `modules/sync/` | todos (suscriptor de eventos) | pendiente |
+| Sincronización / Servidor | `modules/sync/` | todos (suscriptor de eventos) | completo (transporte; el aplicador genérico por entidad queda como extensión futura, ver descripción) |
 | App Android | `android/` | sync (vía API) | fase posterior |
 | Instalador Windows | `installer/` | — | pendiente |
 
@@ -78,7 +78,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 
 **Notificaciones** — Notificaciones internas entre módulos y hacia el usuario (ej. stock bajo, pedido listo en cocina, licencia por expirar).
 
-**Sincronización / Servidor** — Servidor principal embebido (FastAPI + WebSockets) y clientes de sincronización en tiempo real entre estaciones.
+**Sincronización / Servidor** — Servidor principal embebido (FastAPI + WebSocket) y clientes que sondean cada pocos segundos (no push instantáneo). Captura genérica de outbox: `core/events/bus.py::EventBus.subscribe_all` registra `SyncService.capture_event` para TODO evento de dominio publicado en el proceso, sin que cada módulo tenga que suscribirse a mano. Deduplicación/idempotencia por `entity_uuid` = `event_id` (ya un UUID por evento). Alcance de esta versión: transporte real y probado de punta a punta (dos estaciones, dos bases SQLite independientes, protocolo pull/push real por WebSocket); el "aplicador" genérico que reproduzca cada evento recibido sobre las tablas de negocio locales queda fuera a propósito y documentado como extensión futura — cada evento ya se persiste completo en `sync_log`, listo para que un aplicador futuro lo consuma.
 
 **App Android** (fase posterior) — Cliente delgado sin base de datos propia, consume la API del servidor principal: tomar pedidos, cobrar, consultar mesas/productos.
 

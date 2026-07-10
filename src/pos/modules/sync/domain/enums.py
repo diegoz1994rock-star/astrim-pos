@@ -28,3 +28,16 @@ class SyncConflictResolution(enum.Enum):
     LOCAL_WINS = "local_wins"
     REMOTE_WINS = "remote_wins"
     MANUAL = "manual"
+
+
+class SyncMode(enum.Enum):
+    """Rol de sincronización de esta estación, configurable desde la UI.
+
+    La sincronización es opt-in (ARCHITECTURE.md §10): con `DISABLED` la
+    app funciona igual que una estación única, sin ningún proceso de red
+    adicional.
+    """
+
+    DISABLED = "disabled"
+    PRIMARY = "primary"
+    CLIENT = "client"

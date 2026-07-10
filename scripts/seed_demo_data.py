@@ -48,6 +48,7 @@ DEFAULT_PERMISSIONS = [
     "settings.manage",
     "licensing.manage",
     "backups.manage",
+    "sync.manage",
 ]
 
 DEFAULT_BUSINESS_SETTINGS = [

@@ -80,6 +80,10 @@ from pos.modules.settings.application.business_settings_service import BusinessS
 from pos.modules.suppliers.application.supplier_service import SupplierManagementService
 from pos.modules.suppliers.presentation.suppliers_view import SuppliersView
 from pos.modules.suppliers.presentation.suppliers_view_model import SuppliersViewModel
+from pos.modules.sync.application.sync_service import SyncService
+from pos.modules.sync.application.sync_transport import SyncTransport
+from pos.modules.sync.presentation.sync_view import SyncView
+from pos.modules.sync.presentation.sync_view_model import SyncViewModel
 from pos.modules.users.application.user_management_service import UserManagementService
 from pos.modules.users.presentation.users_view import UsersView
 from pos.modules.users.presentation.users_view_model import UsersViewModel
@@ -153,11 +157,23 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
         BackupService,
         lambda: BackupService(config.database_url, config.data_dir / "backups"),
     )
+    container.register_singleton(
+        SyncService,
+        lambda: SyncService(event_bus, container.resolve(BusinessSettingsService)),
+    )
+    container.register_singleton(
+        SyncTransport, lambda: SyncTransport(container.resolve(SyncService))
+    )
 
     # Registro de manejadores de eventos entre módulos (ver ARCHITECTURE.md
     # §5): Inventario reacciona a que Productos publique un producto nuevo.
     inventory_handlers = InventoryProductEventHandlers(container.resolve(InventoryService))
     event_bus.subscribe(ProductCreatedEvent, inventory_handlers.on_product_created)
+
+    # Captura de outbox de Sincronización (ARCHITECTURE.md §10): TODO evento
+    # de dominio publicado en el proceso queda registrado como entrada de
+    # `sync_log`, sin que cada módulo nuevo tenga que suscribirse a mano.
+    event_bus.subscribe_all(container.resolve(SyncService).capture_event)
 
     return config
 
@@ -262,6 +278,11 @@ def _build_license_content(container: Container) -> QWidget:
     return LicenseView(LicenseViewModel(license_service))
 
 
+def _build_sync_content(container: Container) -> QWidget:
+    transport = container.resolve(SyncTransport)
+    return SyncView(SyncViewModel(transport))
+
+
 def _build_third_parties_content(container: Container) -> QWidget:
     customer_service = container.resolve(CustomerManagementService)
     supplier_service = container.resolve(SupplierManagementService)
@@ -296,6 +317,7 @@ def _build_nav_panels(
             "Licencia", "licensing.manage", lambda: open_panel(_build_license_content)
         ),
         NavPanel("Backups", "backups.manage", lambda: open_panel(_build_backups_content)),
+        NavPanel("Sincronización", "sync.manage", lambda: open_panel(_build_sync_content)),
     ]
 
 
@@ -402,12 +424,16 @@ def main() -> int:
     backup_scheduler = BackupScheduler(container.resolve(BackupService))
     backup_scheduler.start()
 
+    sync_transport = container.resolve(SyncTransport)
+    sync_transport.apply_persisted_mode()
+
     window = build_main_window(theme_manager, container)
     window.show()
     try:
         return app.exec()
     finally:
         backup_scheduler.shutdown()
+        sync_transport.shutdown()
 
 
 if __name__ == "__main__":
