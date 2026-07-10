@@ -17,6 +17,10 @@ dist/
 .env
 *.local.toml
 
+# Claves privadas de licenciamiento: NUNCA se versionan (ver ARCHITECTURE.md §9)
+scripts/vendor_private_key*.txt
+*.private_key
+
 # Backups generados
 /backups_output/
 

@@ -12,6 +12,7 @@ from sqlalchemy import Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pos.core.database.base import Base, TimestampMixin, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.restaurant.domain.enums import (
     OrderItemStatus,
     OrderStatus,
@@ -48,8 +49,8 @@ class TableSession(Base):
     status: Mapped[TableSessionStatus] = mapped_column(
         Enum(TableSessionStatus, native_enum=False), default=TableSessionStatus.OPEN, nullable=False
     )
-    opened_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
-    closed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class Order(Base, TimestampMixin):
@@ -102,7 +103,7 @@ class OrderItemStatusHistory(Base):
     status: Mapped[OrderItemStatus] = mapped_column(
         Enum(OrderItemStatus, native_enum=False), nullable=False
     )
-    changed_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     changed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
 

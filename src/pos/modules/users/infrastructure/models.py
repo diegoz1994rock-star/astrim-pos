@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import AuditedEntity, Base
+from pos.core.database.types import UTCDateTime
 
 
 class User(Base, AuditedEntity):
@@ -30,4 +31,4 @@ class User(Base, AuditedEntity):
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

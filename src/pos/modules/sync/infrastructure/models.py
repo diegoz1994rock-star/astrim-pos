@@ -9,6 +9,7 @@ from sqlalchemy import Boolean, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, TimestampMixin, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.sync.domain.enums import (
     SyncConflictResolution,
     SyncLogStatus,
@@ -26,7 +27,7 @@ class SyncStation(Base, TimestampMixin):
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     """Solo una estación de la red debe tener `is_primary=True` a la vez."""
 
-    last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     status: Mapped[SyncStationStatus] = mapped_column(
         Enum(SyncStationStatus, native_enum=False),
         default=SyncStationStatus.OFFLINE,
@@ -54,8 +55,8 @@ class SyncLog(Base):
     status: Mapped[SyncLogStatus] = mapped_column(
         Enum(SyncLogStatus, native_enum=False), default=SyncLogStatus.PENDING, nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
-    applied_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class SyncConflict(Base):
@@ -75,5 +76,5 @@ class SyncConflict(Base):
         default=SyncConflictResolution.PENDING,
         nullable=False,
     )
-    resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)

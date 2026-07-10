@@ -10,6 +10,7 @@ from sqlalchemy import Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import AuditedEntity, Base, utc_now
+from pos.core.database.types import UTCDateTime
 
 
 class Customer(Base, AuditedEntity):
@@ -52,7 +53,7 @@ class CustomerCreditMovement(Base):
     reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
     """Referencia opcional, ej. el `uuid` de la venta que originó el cargo."""
 
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
 
@@ -75,4 +76,4 @@ class CustomerLoyaltyPoints(Base):
         Enum(LoyaltyPointsMovementType, native_enum=False), nullable=False
     )
     reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)

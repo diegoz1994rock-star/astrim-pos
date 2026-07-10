@@ -8,6 +8,7 @@ from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, TimestampMixin, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.backups.domain.enums import BackupStatus
 
 
@@ -34,8 +35,8 @@ class BackupHistory(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     backup_job_id: Mapped[int | None] = mapped_column(ForeignKey("backup_jobs.id"), nullable=True)
-    started_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
-    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     status: Mapped[BackupStatus] = mapped_column(
         Enum(BackupStatus, native_enum=False), default=BackupStatus.IN_PROGRESS, nullable=False
     )

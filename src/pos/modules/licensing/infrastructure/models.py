@@ -10,6 +10,7 @@ from sqlalchemy import Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, TimestampMixin, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.licensing.domain.enums import (
     LicenseStatus,
     LicenseType,
@@ -32,8 +33,8 @@ class License(Base, TimestampMixin):
     license_type: Mapped[LicenseType] = mapped_column(
         Enum(LicenseType, native_enum=False), nullable=False
     )
-    issued_at: Mapped[datetime] = mapped_column(nullable=False)
-    expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    issued_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     """Nulo únicamente para licencias `PERMANENT`."""
 
     hardware_fingerprint: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -51,7 +52,7 @@ class LicenseActivation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     license_id: Mapped[int] = mapped_column(ForeignKey("licenses.id"), nullable=False)
-    activated_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    activated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     hardware_fingerprint: Mapped[str] = mapped_column(String(128), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
 
@@ -65,7 +66,7 @@ class LicenseVerificationLog(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     license_id: Mapped[int] = mapped_column(ForeignKey("licenses.id"), nullable=False)
-    verified_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    verified_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     result: Mapped[LicenseVerificationResult] = mapped_column(
         Enum(LicenseVerificationResult, native_enum=False), nullable=False
     )

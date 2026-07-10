@@ -9,6 +9,7 @@ from sqlalchemy import Enum, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pos.core.database.base import AuditedEntity, Base, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.purchasing.domain.enums import PurchaseOrderStatus
 
 
@@ -55,5 +56,5 @@ class PurchaseReceipt(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     purchase_order_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id"), nullable=False)
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False)
-    received_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     received_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)

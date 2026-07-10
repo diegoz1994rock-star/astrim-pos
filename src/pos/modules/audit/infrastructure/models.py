@@ -14,6 +14,7 @@ from sqlalchemy import Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.audit.domain.enums import AuditAction
 
 
@@ -37,4 +38,4 @@ class AuditLog(Base):
     )
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     changes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)

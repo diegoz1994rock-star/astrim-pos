@@ -9,8 +9,10 @@ from __future__ import annotations
 import uuid as uuid_lib
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from pos.core.database.types import UTCDateTime
 
 
 class Base(DeclarativeBase):
@@ -48,11 +50,9 @@ class UUIDMixin:
 class TimestampMixin:
     """Columnas de auditoría temporal `created_at` / `updated_at`."""
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        UTCDateTime, default=utc_now, onupdate=utc_now, nullable=False
     )
 
 
@@ -77,7 +77,7 @@ class SoftDeleteMixin:
     """
 
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class AuditedEntity(UUIDMixin, TimestampMixin, UserStampMixin, SoftDeleteMixin):

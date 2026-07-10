@@ -7,7 +7,6 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
-    DateTime,
     Enum,
     ForeignKey,
     Numeric,
@@ -17,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, TimestampMixin, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.inventory.domain.enums import StockMovementType
 
 
@@ -49,7 +49,7 @@ class StockLevel(Base):
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        UTCDateTime, default=utc_now, onupdate=utc_now, nullable=False
     )
 
 
@@ -76,7 +76,7 @@ class StockMovement(Base):
     reference_document_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     reference_document_id: Mapped[int | None] = mapped_column(nullable=True)
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
 
@@ -92,7 +92,7 @@ class ProductBatch(Base):
     batch_code: Mapped[str] = mapped_column(String(50), nullable=False)
     expiration_date: Mapped[date | None] = mapped_column(nullable=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
 
 
 class StockAlertConfig(Base):

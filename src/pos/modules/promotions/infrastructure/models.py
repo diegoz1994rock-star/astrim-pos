@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pos.core.database.base import Base, TimestampMixin, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.promotions.domain.enums import DiscountType, PromotionRuleType
 
 
@@ -24,8 +25,8 @@ class Promotion(Base, TimestampMixin):
         Enum(DiscountType, native_enum=False), nullable=False
     )
     discount_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    starts_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     rules: Mapped[list[PromotionRule]] = relationship(
@@ -64,4 +65,4 @@ class DiscountApplied(Base):
     promotion_id: Mapped[int | None] = mapped_column(ForeignKey("promotions.id"), nullable=True)
     sale_item_id: Mapped[int | None] = mapped_column(ForeignKey("sale_items.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    applied_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    applied_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)

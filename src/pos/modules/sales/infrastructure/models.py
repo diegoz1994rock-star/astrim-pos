@@ -13,6 +13,7 @@ from sqlalchemy import Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pos.core.database.base import AuditedEntity, Base, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.sales.domain.enums import PaymentMethod, SaleStatus, SaleType
 
 
@@ -74,6 +75,6 @@ class SalePayment(Base):
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    paid_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    paid_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
 
     sale: Mapped[Sale] = relationship(back_populates="payments")

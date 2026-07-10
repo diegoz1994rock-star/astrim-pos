@@ -49,6 +49,11 @@ from pos.modules.inventory.application.event_handlers import InventoryProductEve
 from pos.modules.inventory.application.inventory_service import InventoryService
 from pos.modules.inventory.presentation.inventory_view import InventoryView
 from pos.modules.inventory.presentation.inventory_view_model import InventoryViewModel
+from pos.modules.licensing.application.license_service import LicenseService
+from pos.modules.licensing.domain.enums import LicenseVerificationResult
+from pos.modules.licensing.infrastructure.embedded_public_key import VENDOR_PUBLIC_KEY_B64
+from pos.modules.licensing.presentation.license_view import LicenseView
+from pos.modules.licensing.presentation.license_view_model import LicenseViewModel
 from pos.modules.products.application.category_service import CategoryManagementService
 from pos.modules.products.application.product_service import ProductManagementService
 from pos.modules.products.domain.events import ProductCreatedEvent
@@ -136,6 +141,9 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     )
     container.register_singleton(
         ReportsService, lambda: ReportsService(container.resolve(InventoryService))
+    )
+    container.register_singleton(
+        LicenseService, lambda: LicenseService(VENDOR_PUBLIC_KEY_B64, config.data_dir)
     )
 
     # Registro de manejadores de eventos entre módulos (ver ARCHITECTURE.md
@@ -236,6 +244,11 @@ def _build_reports_content(container: Container) -> QWidget:
     return ReportsView(ReportsViewModel(reports_service))
 
 
+def _build_license_content(container: Container) -> QWidget:
+    license_service = container.resolve(LicenseService)
+    return LicenseView(LicenseViewModel(license_service))
+
+
 def _build_third_parties_content(container: Container) -> QWidget:
     customer_service = container.resolve(CustomerManagementService)
     supplier_service = container.resolve(SupplierManagementService)
@@ -266,6 +279,9 @@ def _build_nav_panels(
         ),
         NavPanel("Ventas", "sales.create", lambda: open_panel(_build_sales_content)),
         NavPanel("Reportes", "reports.view", lambda: open_panel(_build_reports_content)),
+        NavPanel(
+            "Licencia", "licensing.manage", lambda: open_panel(_build_license_content)
+        ),
     ]
 
 
@@ -308,18 +324,34 @@ def build_welcome_widget(
 
 
 def build_main_window(theme_manager: ThemeManager, container: Container) -> QMainWindow:
-    """Construye la ventana principal: arranca mostrando el login y, tras
-    autenticar, cambia al contenido de la aplicación."""
+    """Construye la ventana principal.
+
+    Arranca verificando la licencia (PROJECT_SPEC.md, "LICENCIAS"): si no
+    es válida, bloquea el acceso de forma elegante mostrando la pantalla de
+    activación en vez del login — nada de la operación del negocio es
+    alcanzable sin una licencia vigente. Si es válida, procede al login
+    normalmente.
+    """
     theme_manager.apply_light()
     window = QMainWindow()
     window.setWindowTitle("Sistema POS")
     window.resize(1280, 800)
     auth_service = container.resolve(AuthenticationService)
+    license_service = container.resolve(LicenseService)
 
     def show_login() -> None:
         login_view = LoginView(LoginViewModel(auth_service))
         login_view.authenticated.connect(show_welcome)
         window.setCentralWidget(login_view)
+
+    def show_license_gate() -> None:
+        license_view_model = LicenseViewModel(license_service)
+        license_view_model.status_changed.connect(
+            lambda verification: show_login()
+            if verification.result is LicenseVerificationResult.VALID
+            else None
+        )
+        window.setCentralWidget(LicenseView(license_view_model))
 
     def show_welcome(session: ActiveSession) -> None:
         def handle_logout() -> None:
@@ -336,7 +368,11 @@ def build_main_window(theme_manager: ThemeManager, container: Container) -> QMai
         panels = _build_nav_panels(container, open_panel)
         window.setCentralWidget(build_welcome_widget(session, handle_logout, panels))
 
-    show_login()
+    initial_verification = license_service.verify()
+    if initial_verification.result is LicenseVerificationResult.VALID:
+        show_login()
+    else:
+        show_license_gate()
     return window
 
 

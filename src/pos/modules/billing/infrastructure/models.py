@@ -13,6 +13,7 @@ from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, utc_now
+from pos.core.database.types import UTCDateTime
 
 
 class Invoice(Base):
@@ -28,7 +29,7 @@ class Invoice(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id"), unique=True, nullable=False)
     invoice_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    issued_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     customer_name_snapshot: Mapped[str | None] = mapped_column(String(150), nullable=True)
     customer_document_snapshot: Mapped[str | None] = mapped_column(String(30), nullable=True)
     tax_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)

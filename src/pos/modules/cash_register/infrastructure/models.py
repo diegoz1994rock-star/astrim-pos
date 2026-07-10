@@ -9,6 +9,7 @@ from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, TimestampMixin, utc_now
+from pos.core.database.types import UTCDateTime
 from pos.modules.cash_register.domain.enums import CashMovementType, CashSessionStatus
 
 
@@ -40,10 +41,10 @@ class CashSession(Base):
         Enum(CashSessionStatus, native_enum=False), default=CashSessionStatus.OPEN, nullable=False
     )
     opened_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    opened_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     opening_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     closed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    closed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     closing_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     expected_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     difference: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
@@ -61,5 +62,5 @@ class CashMovement(Base):
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)

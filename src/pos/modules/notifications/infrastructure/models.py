@@ -8,6 +8,7 @@ from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, utc_now
+from pos.core.database.types import UTCDateTime
 
 
 class Notification(Base):
@@ -31,4 +32,4 @@ class Notification(Base):
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     related_entity_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
     related_entity_id: Mapped[int | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)

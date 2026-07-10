@@ -24,7 +24,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Promociones y Descuentos | `modules/promotions/` | products, sales | pendiente |
 | Reportes | `modules/reports/` | sales, inventory, cash_register, customers, users, billing | completo (parcial: ventas/productos/inventario/caja; clientes/usuarios/impuestos/ganancias pendientes) |
 | Configuración (panel admin) | `modules/settings/` | — | pendiente |
-| Licencias | `modules/licensing/` | — | pendiente |
+| Licencias | `modules/licensing/` | — | completo |
 | Backups | `modules/backups/` | — | pendiente |
 | Auditoría | `modules/audit/` | todos (suscriptor de eventos) | pendiente |
 | Notificaciones | `modules/notifications/` | kitchen, inventory, licensing | pendiente |
