@@ -39,6 +39,7 @@ DEFAULT_PERMISSIONS = [
     "roles.manage",
     "products.manage",
     "inventory.manage",
+    "customers.manage",
     "sales.create",
     "sales.void",
     "cash_register.manage",

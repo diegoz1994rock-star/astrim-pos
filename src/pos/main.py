@@ -37,6 +37,9 @@ from pos.core.security.session import ActiveSession, SessionManager
 from pos.modules.auth.application.authentication_service import AuthenticationService
 from pos.modules.auth.presentation.login_view import LoginView
 from pos.modules.auth.presentation.login_view_model import LoginViewModel
+from pos.modules.customers.application.customer_service import CustomerManagementService
+from pos.modules.customers.presentation.customers_view import CustomersView
+from pos.modules.customers.presentation.customers_view_model import CustomersViewModel
 from pos.modules.inventory.application.event_handlers import InventoryProductEventHandlers
 from pos.modules.inventory.application.inventory_service import InventoryService
 from pos.modules.inventory.presentation.inventory_view import InventoryView
@@ -52,6 +55,9 @@ from pos.modules.roles.application.role_management_service import RoleManagement
 from pos.modules.roles.presentation.roles_view import RolesView
 from pos.modules.roles.presentation.roles_view_model import RolesViewModel
 from pos.modules.settings.application.business_settings_service import BusinessSettingsService
+from pos.modules.suppliers.application.supplier_service import SupplierManagementService
+from pos.modules.suppliers.presentation.suppliers_view import SuppliersView
+from pos.modules.suppliers.presentation.suppliers_view_model import SuppliersViewModel
 from pos.modules.users.application.user_management_service import UserManagementService
 from pos.modules.users.presentation.users_view import UsersView
 from pos.modules.users.presentation.users_view_model import UsersViewModel
@@ -101,6 +107,8 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
         ProductManagementService, lambda: ProductManagementService(event_bus)
     )
     container.register_singleton(InventoryService, lambda: InventoryService(event_bus))
+    container.register_singleton(CustomerManagementService, CustomerManagementService)
+    container.register_singleton(SupplierManagementService, SupplierManagementService)
 
     # Registro de manejadores de eventos entre módulos (ver ARCHITECTURE.md
     # §5): Inventario reacciona a que Productos publique un producto nuevo.
@@ -158,6 +166,15 @@ def _build_inventory_content(container: Container) -> QWidget:
     return InventoryView(InventoryViewModel(inventory_service, product_service))
 
 
+def _build_third_parties_content(container: Container) -> QWidget:
+    customer_service = container.resolve(CustomerManagementService)
+    supplier_service = container.resolve(SupplierManagementService)
+    tabs = QTabWidget()
+    tabs.addTab(CustomersView(CustomersViewModel(customer_service)), "Clientes")
+    tabs.addTab(SuppliersView(SuppliersViewModel(supplier_service)), "Proveedores")
+    return tabs
+
+
 def _build_nav_panels(
     container: Container, open_panel: Callable[[Callable[[Container], QWidget]], None]
 ) -> list[NavPanel]:
@@ -168,6 +185,11 @@ def _build_nav_panels(
         NavPanel("Catálogo", "products.manage", lambda: open_panel(_build_catalog_content)),
         NavPanel(
             "Inventario", "inventory.manage", lambda: open_panel(_build_inventory_content)
+        ),
+        NavPanel(
+            "Clientes y Proveedores",
+            "customers.manage",
+            lambda: open_panel(_build_third_parties_content),
         ),
     ]
 

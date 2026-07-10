@@ -11,8 +11,8 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Login / Autenticación | `modules/auth/` | users, roles | completo |
 | Usuarios | `modules/users/` | roles | completo |
 | Roles y Permisos | `modules/roles/` | — | completo |
-| Clientes | `modules/customers/` | — | pendiente |
-| Proveedores | `modules/suppliers/` | — | pendiente |
+| Clientes | `modules/customers/` | — | completo |
+| Proveedores | `modules/suppliers/` | — | completo |
 | Productos y Categorías | `modules/products/` | inventory (stock) | completo |
 | Inventario | `modules/inventory/` | products | completo |
 | Compras | `modules/purchasing/` | products, inventory, suppliers | pendiente |
