@@ -17,7 +17,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Inventario | `modules/inventory/` | products | completo |
 | Compras | `modules/purchasing/` | products, inventory, suppliers | pendiente |
 | Ventas | `modules/sales/` | products, inventory, customers, cash_register, promotions (solo presentación, ver descripción) | completo |
-| Facturación / Impuestos | `modules/billing/` | sales, settings | pendiente |
+| Facturación / Impuestos | `modules/billing/` | sales, customers, settings (todo vía sus servicios de aplicación, solo lectura) | completo |
 | Caja | `modules/cash_register/` | — | completo |
 | Mesas y Pedidos (Restaurante) | `modules/restaurant/` | products (solo lectura) | completo (conversión de mesa a Venta real queda pendiente, ver descripción) |
 | Cocina | `modules/kitchen/` | restaurant, products (solo lectura) | completo |
@@ -56,7 +56,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 
 **Ventas** — Registro de venta (POS), aplicación de promociones/descuentos/impuestos, múltiples medios de pago.
 
-**Facturación / Impuestos** — Generación de comprobantes/facturas, cálculo de impuestos configurables por producto/región.
+**Facturación / Impuestos** — `BillingService.generate_invoice(sale_id)` genera un comprobante PDF a partir de una venta ya completada (numeración secuencial `F-000001`, idempotente — pedir la factura dos veces de la misma venta devuelve la misma), con una foto del nombre/documento del cliente al momento de facturar (`customer_name_snapshot`/`customer_document_snapshot`, para que la factura no cambie retroactivamente si el cliente edita sus datos después). El PDF lo genera `billing/infrastructure/pdf_renderer.py` con ReportLab directamente (no reutiliza `reports/infrastructure/exporter.py::export_table_to_pdf` tal cual — ese solo dibuja título+tabla; una factura necesita además bloques de negocio/cliente/totales, forzarlo en una tabla genérica habría dado un documento de mala calidad para lo que es, en la mayoría de países, un comprobante con valor fiscal). Integrado como acción "Facturar venta seleccionada" en el historial de Ventas, no como panel aparte. El cálculo de impuestos en sí ya vive en `products`/`sales` desde M4/M7 (impuestos por producto); este módulo solo emite el comprobante.
 
 **Caja** — Apertura y cierre de caja, arqueos, movimientos de efectivo (ingresos/egresos manuales), cuadre.
 

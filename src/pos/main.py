@@ -42,6 +42,7 @@ from pos.modules.backups.application.backup_service import BackupService
 from pos.modules.backups.application.scheduler import BackupScheduler
 from pos.modules.backups.presentation.backups_view import BackupsView
 from pos.modules.backups.presentation.backups_view_model import BackupsViewModel
+from pos.modules.billing.application.billing_service import BillingService
 from pos.modules.cash_register.application.cash_register_service import CashRegisterService
 from pos.modules.cash_register.presentation.cash_register_view import CashRegisterView
 from pos.modules.cash_register.presentation.cash_register_view_model import (
@@ -167,6 +168,15 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
         ReportsService, lambda: ReportsService(container.resolve(InventoryService))
     )
     container.register_singleton(
+        BillingService,
+        lambda: BillingService(
+            container.resolve(SalesService),
+            container.resolve(CustomerManagementService),
+            container.resolve(BusinessSettingsService),
+            config.data_dir / "invoices",
+        ),
+    )
+    container.register_singleton(
         LicenseService, lambda: LicenseService(VENDOR_PUBLIC_KEY_B64, config.data_dir)
     )
     container.register_singleton(
@@ -275,6 +285,7 @@ def _build_sales_content(container: Container) -> QWidget:
     inventory_service = container.resolve(InventoryService)
     cash_register_service = container.resolve(CashRegisterService)
     promotion_service = container.resolve(PromotionService)
+    billing_service = container.resolve(BillingService)
     session_manager = container.resolve(SessionManager)
 
     tabs = QTabWidget()
@@ -294,7 +305,9 @@ def _build_sales_content(container: Container) -> QWidget:
     )
     tabs.addTab(
         SalesHistoryView(
-            SalesHistoryViewModel(sales_service, inventory_service, session_manager)
+            SalesHistoryViewModel(
+                sales_service, inventory_service, billing_service, session_manager
+            )
         ),
         "Historial",
     )

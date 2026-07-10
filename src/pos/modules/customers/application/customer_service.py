@@ -42,6 +42,14 @@ class CustomerManagementService:
                 for customer in repo.list_all()
             ]
 
+    def get_customer(self, customer_id: int) -> CustomerDTO | None:
+        with session_scope() as session:
+            repo = CustomerRepository(session)
+            customer = repo.get(customer_id)
+            if customer is None:
+                return None
+            return _to_dto(customer, repo.get_current_debt(customer.id))
+
     def create_customer(
         self,
         *,

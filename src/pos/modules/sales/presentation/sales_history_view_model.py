@@ -6,6 +6,7 @@ from PySide6.QtCore import QObject, Signal
 
 from pos.core.exceptions import DomainError
 from pos.core.security.session import SessionManager
+from pos.modules.billing.application.billing_service import BillingService
 from pos.modules.inventory.application.inventory_service import InventoryService
 from pos.modules.sales.application.sale_service import SalesService
 
@@ -19,16 +20,28 @@ class SalesHistoryViewModel(QObject):
         self,
         sales_service: SalesService,
         inventory_service: InventoryService,
+        billing_service: BillingService,
         session_manager: SessionManager,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._sales_service = sales_service
         self._inventory_service = inventory_service
+        self._billing_service = billing_service
         self._session_manager = session_manager
 
     def load(self) -> None:
         self.sales_loaded.emit(self._sales_service.list_recent_sales())
+
+    def generate_invoice(self, sale_id: int) -> None:
+        try:
+            invoice = self._billing_service.generate_invoice(sale_id)
+        except DomainError as error:
+            self.error_occurred.emit(str(error))
+        else:
+            self.operation_succeeded.emit(
+                f"Factura {invoice.invoice_number} generada: {invoice.pdf_path}"
+            )
 
     def void_sale(self, sale_id: int, reason: str) -> None:
         default_warehouse = next(iter(self._inventory_service.list_warehouses()), None)

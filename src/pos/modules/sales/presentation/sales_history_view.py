@@ -50,11 +50,14 @@ class SalesHistoryView(QWidget):
 
         actions = QHBoxLayout()
         self._void_button = QPushButton("Anular venta seleccionada")
+        self._invoice_button = QPushButton("Facturar venta seleccionada")
         actions.addWidget(self._void_button)
+        actions.addWidget(self._invoice_button)
         layout.addLayout(actions)
 
     def _connect_signals(self) -> None:
         self._void_button.clicked.connect(self._on_void_clicked)
+        self._invoice_button.clicked.connect(self._on_invoice_clicked)
         self._view_model.sales_loaded.connect(self._on_sales_loaded)
         self._view_model.error_occurred.connect(self._show_error)
         self._view_model.operation_succeeded.connect(self._show_info)
@@ -79,6 +82,14 @@ class SalesHistoryView(QWidget):
             return
         reason, _ = QInputDialog.getText(self, "Anular venta", "Motivo (opcional):")
         self._view_model.void_sale(sale.id, reason)
+
+    def _on_invoice_clicked(self) -> None:
+        selected_rows = self._table.selectionModel().selectedRows()
+        if not selected_rows:
+            self._show_error("Selecciona una venta de la tabla.")
+            return
+        sale = self._sales[selected_rows[0].row()]
+        self._view_model.generate_invoice(sale.id)
 
     def _show_error(self, message: str) -> None:
         QMessageBox.warning(self, "Error", message)
