@@ -56,6 +56,9 @@ from pos.modules.products.presentation.categories_view import CategoriesView
 from pos.modules.products.presentation.categories_view_model import CategoriesViewModel
 from pos.modules.products.presentation.products_view import ProductsView
 from pos.modules.products.presentation.products_view_model import ProductsViewModel
+from pos.modules.reports.application.reports_service import ReportsService
+from pos.modules.reports.presentation.reports_view import ReportsView
+from pos.modules.reports.presentation.reports_view_model import ReportsViewModel
 from pos.modules.roles.application.role_management_service import RoleManagementService
 from pos.modules.roles.presentation.roles_view import RolesView
 from pos.modules.roles.presentation.roles_view_model import RolesViewModel
@@ -130,6 +133,9 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
             container.resolve(CashRegisterService),
             container.resolve(CustomerManagementService),
         ),
+    )
+    container.register_singleton(
+        ReportsService, lambda: ReportsService(container.resolve(InventoryService))
     )
 
     # Registro de manejadores de eventos entre módulos (ver ARCHITECTURE.md
@@ -225,6 +231,11 @@ def _build_sales_content(container: Container) -> QWidget:
     return tabs
 
 
+def _build_reports_content(container: Container) -> QWidget:
+    reports_service = container.resolve(ReportsService)
+    return ReportsView(ReportsViewModel(reports_service))
+
+
 def _build_third_parties_content(container: Container) -> QWidget:
     customer_service = container.resolve(CustomerManagementService)
     supplier_service = container.resolve(SupplierManagementService)
@@ -254,6 +265,7 @@ def _build_nav_panels(
             "Caja", "cash_register.manage", lambda: open_panel(_build_cash_register_content)
         ),
         NavPanel("Ventas", "sales.create", lambda: open_panel(_build_sales_content)),
+        NavPanel("Reportes", "reports.view", lambda: open_panel(_build_reports_content)),
     ]
 
 

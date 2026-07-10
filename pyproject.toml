@@ -30,6 +30,8 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
     "factory_boy>=3.3",
+    "types-openpyxl",
+    "types-reportlab",
 ]
 
 [project.scripts]
