@@ -8,6 +8,7 @@ from pos.core.database.session import session_scope
 from pos.core.events.bus import EventBus
 from pos.core.exceptions import BusinessRuleViolationError, ConflictError, NotFoundError
 from pos.modules.roles.application.dto import PermissionDTO, RoleDTO
+from pos.modules.roles.application.system_bootstrap import ensure_system_roles_and_permissions
 from pos.modules.roles.domain.events import RolePermissionsChangedEvent
 from pos.modules.roles.infrastructure.models import Role
 from pos.modules.roles.infrastructure.repository import RoleRepository
@@ -29,6 +30,11 @@ class RoleManagementService:
 
     def __init__(self, event_bus: EventBus) -> None:
         self._event_bus = event_bus
+
+    def ensure_system_defaults(self) -> int:
+        """Crea los roles/permisos base si es el primer arranque (ver
+        `system_bootstrap.py`). Devuelve el id de "Administrador General"."""
+        return ensure_system_roles_and_permissions()
 
     def list_roles(self) -> list[RoleDTO]:
         with session_scope() as session:

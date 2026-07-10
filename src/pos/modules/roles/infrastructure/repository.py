@@ -39,6 +39,12 @@ class RoleRepository:
             return []
         return list(self._session.scalars(select(Permission).where(Permission.code.in_(codes))))
 
+    def create_permission(self, *, code: str, description: str | None) -> Permission:
+        permission = Permission(code=code, description=description)
+        self._session.add(permission)
+        self._session.flush()
+        return permission
+
     def create_role(self, *, name: str, description: str | None, is_system_role: bool) -> Role:
         role = Role(name=name, description=description, is_system_role=is_system_role)
         self._session.add(role)

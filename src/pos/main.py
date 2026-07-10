@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from pos.core.config.bootstrap import BootstrapConfig, load_bootstrap_config
+from pos.core.database.migrate import run_pending_migrations
 from pos.core.database.session import init_engine
 from pos.core.di.container import Container, get_container
 from pos.core.events.bus import EventBus, get_event_bus
@@ -85,6 +86,8 @@ from pos.modules.sync.application.sync_transport import SyncTransport
 from pos.modules.sync.presentation.sync_view import SyncView
 from pos.modules.sync.presentation.sync_view_model import SyncViewModel
 from pos.modules.users.application.user_management_service import UserManagementService
+from pos.modules.users.presentation.first_run_setup_view import FirstRunSetupView
+from pos.modules.users.presentation.first_run_setup_view_model import FirstRunSetupViewModel
 from pos.modules.users.presentation.users_view import UsersView
 from pos.modules.users.presentation.users_view_model import UsersViewModel
 from pos.shared_ui.theme.theme_manager import ThemeManager
@@ -114,6 +117,7 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     """
     config = load_bootstrap_config()
     setup_logging(config.log_dir, level=_parse_log_level(config.log_level))
+    run_pending_migrations(config.database_url)
     init_engine(config.database_url)
 
     event_bus = get_event_bus()
@@ -374,11 +378,31 @@ def build_main_window(theme_manager: ThemeManager, container: Container) -> QMai
     window.resize(1280, 800)
     auth_service = container.resolve(AuthenticationService)
     license_service = container.resolve(LicenseService)
+    user_service = container.resolve(UserManagementService)
 
     def show_login() -> None:
+        if user_service.count_users() == 0:
+            show_first_run_setup()
+            return
         login_view = LoginView(LoginViewModel(auth_service))
         login_view.authenticated.connect(show_welcome)
         window.setCentralWidget(login_view)
+
+    def show_first_run_setup() -> None:
+        """Base de datos recién creada (sin usuarios): en vez de un login
+        vacío e inutilizable, se pide crear la cuenta de administrador —
+        necesario para que el instalador de Windows (ver README.md,
+        sección Instalador) entregue una app realmente usable sin depender
+        de `scripts/seed_demo_data.py`, que es solo para desarrollo."""
+        setup_view_model = FirstRunSetupViewModel(
+            container.resolve(RoleManagementService),
+            user_service,
+            container.resolve(BusinessSettingsService),
+            auth_service,
+        )
+        setup_view = FirstRunSetupView(setup_view_model)
+        setup_view.setup_completed.connect(show_welcome)
+        window.setCentralWidget(setup_view)
 
     def show_license_gate() -> None:
         license_view_model = LicenseViewModel(license_service)

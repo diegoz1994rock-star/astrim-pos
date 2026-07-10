@@ -47,6 +47,13 @@ class UserManagementService:
                 _to_dto(user, role_name) for user, role_name in repo.list_active_users_with_role()
             ]
 
+    def count_users(self) -> int:
+        """Usado por `main.py` para decidir si mostrar la pantalla de
+        configuración inicial (base de datos recién creada, cero usuarios)
+        en vez del login normal."""
+        with session_scope() as session:
+            return UserRepository(session).count_users()
+
     def create_user(
         self,
         *,

@@ -8,7 +8,7 @@ también a nivel de infraestructura, no solo de aplicación.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from pos.modules.roles.infrastructure.models import Role
@@ -41,6 +41,9 @@ class UserRepository:
 
     def get_by_username(self, username: str) -> User | None:
         return self._session.scalar(select(User).where(User.username == username))
+
+    def count_users(self) -> int:
+        return self._session.scalar(select(func.count()).select_from(User)) or 0
 
     def create_user(
         self,

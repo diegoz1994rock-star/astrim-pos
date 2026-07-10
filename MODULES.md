@@ -30,7 +30,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Notificaciones | `modules/notifications/` | kitchen, inventory, licensing | pendiente |
 | Sincronización / Servidor | `modules/sync/` | todos (suscriptor de eventos) | completo (transporte; el aplicador genérico por entidad queda como extensión futura, ver descripción) |
 | App Android | `android/` | sync (vía API) | fase posterior |
-| Instalador Windows | `installer/` | — | pendiente |
+| Instalador Windows | `installer/` | — | completo (config. lista; build en Windows real pendiente de ejecutar, ver installer/README.md) |
 
 ## Descripción por módulo
 
@@ -82,4 +82,4 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 
 **App Android** (fase posterior) — Cliente delgado sin base de datos propia, consume la API del servidor principal: tomar pedidos, cobrar, consultar mesas/productos.
 
-**Instalador Windows** — Empaquetado con PyInstaller + instalador Inno Setup tipo asistente simple.
+**Instalador Windows** — `installer/pos.spec` (PyInstaller, modo `--onedir`, con `alembic.ini`/`migrations/` empaquetados e `hiddenimports` de `uvicorn`) + `installer/setup.iss` (Inno Setup, asistente en español, sin privilegios de administrador, no borra los datos del negocio al desinstalar). El primer arranque real quedó resuelto de punta a punta para que el instalador entregue una app usable sin pasos manuales: migraciones de Alembic automáticas (`core/database/migrate.py`) y una pantalla de configuración inicial que crea la cuenta de administrador cuando la base de datos está recién creada (`modules/users/presentation/first_run_setup_view.py`), verificado con un e2e real (licencia → configuración inicial → bienvenida). Pendiente, documentado en `installer/README.md`: un build real en una máquina Windows (PyInstaller no hace cross-compilación, no se pudo instalar en este entorno de desarrollo) y un ícono de aplicación.

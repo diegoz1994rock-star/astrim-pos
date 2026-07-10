@@ -13,6 +13,7 @@ Sistema de punto de venta profesional, modular y configurable desde la interfaz,
 - [`TECHNOLOGIES.md`](TECHNOLOGIES.md) — stack tecnológico y justificación.
 - [`DEVELOPMENT_RULES.md`](DEVELOPMENT_RULES.md) — reglas obligatorias de desarrollo.
 - [`PROGRESS.md`](PROGRESS.md) — estado vivo de avance del proyecto.
+- [`installer/README.md`](installer/README.md) — cómo generar el instalador de Windows (PyInstaller + Inno Setup).
 
 ## Requisitos
 
@@ -25,7 +26,9 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Ejecutar la aplicación
+# Ejecutar la aplicación (aplica las migraciones de Alembic pendientes
+# automáticamente al arrancar, ver core/database/migrate.py — no hace
+# falta correr `alembic upgrade head` a mano salvo que quieras controlarlo tú)
 pos
 # o: python -m pos.main
 
@@ -36,7 +39,10 @@ pytest
 ruff check .
 mypy src
 
-# Aplicar el esquema de base de datos (requerido antes del primer arranque)
+# Opcional: sembrar datos de ejemplo para desarrollo/demos (usuario
+# admin/admin123, bodega, caja, impuesto). Si no lo corres, el primer
+# arranque de `pos` te pedirá crear la cuenta de administrador desde la UI
+# — es el flujo real que verá un cliente final (ver installer/README.md).
 alembic upgrade head
 python scripts/seed_demo_data.py
 ```

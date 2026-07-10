@@ -139,3 +139,18 @@ def test_list_users_excludes_soft_deleted(base_role_id: int) -> None:
     users = service.list_users()
 
     assert any(u.username == "visible" for u in users)
+
+
+def test_count_users_is_zero_on_a_fresh_database(sqlite_engine: None) -> None:
+    service = UserManagementService(EventBus())
+
+    assert service.count_users() == 0
+
+
+def test_count_users_reflects_created_users(base_role_id: int) -> None:
+    service = UserManagementService(EventBus())
+    service.create_user(
+        username="contado", password="clave-valida-123", full_name="Contado", role_id=base_role_id
+    )
+
+    assert service.count_users() == 1

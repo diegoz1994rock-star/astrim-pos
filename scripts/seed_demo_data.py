@@ -22,34 +22,9 @@ from pos.core.database.session import init_engine, session_scope
 from pos.modules.cash_register.infrastructure.models import CashRegister
 from pos.modules.inventory.infrastructure.models import Warehouse
 from pos.modules.products.infrastructure.models import Tax
-from pos.modules.roles.infrastructure.models import Permission, Role, RolePermission
+from pos.modules.roles.application.system_bootstrap import ensure_system_roles_and_permissions
 from pos.modules.settings.infrastructure.models import BusinessSetting, SettingValueType
 from pos.modules.users.infrastructure.models import User
-
-DEFAULT_ROLES = [
-    ("Administrador General", True),
-    ("Gerente", True),
-    ("Cajero", True),
-    ("Mesero", True),
-    ("Cocinero", True),
-    ("Bodeguero", True),
-]
-
-DEFAULT_PERMISSIONS = [
-    "users.manage",
-    "roles.manage",
-    "products.manage",
-    "inventory.manage",
-    "customers.manage",
-    "sales.create",
-    "sales.void",
-    "cash_register.manage",
-    "reports.view",
-    "settings.manage",
-    "licensing.manage",
-    "backups.manage",
-    "sync.manage",
-]
 
 DEFAULT_BUSINESS_SETTINGS = [
     ("business_name", "Mi Negocio", SettingValueType.STRING),
@@ -59,31 +34,19 @@ DEFAULT_BUSINESS_SETTINGS = [
 
 
 def seed(database_url: str) -> None:
-    """Inserta los datos base si aún no existen (idempotente por nombre/clave única)."""
+    """Inserta los datos base si aún no existen (idempotente por nombre/clave única).
+
+    Los roles y permisos base se crean vía `ensure_system_roles_and_permissions`
+    (misma función que usa el primer arranque real de la app empaquetada,
+    `main.py::show_first_run_setup`) — una sola fuente de verdad para esa
+    lista en vez de mantenerla duplicada aquí.
+    """
     init_engine(database_url)
     hasher = PasswordHasher()
 
+    admin_role_id = ensure_system_roles_and_permissions()
+
     with session_scope() as session:
-        admin_role = session.scalar(select(Role).where(Role.name == "Administrador General"))
-        if admin_role is None:
-            roles_by_name: dict[str, Role] = {}
-            for name, is_system in DEFAULT_ROLES:
-                role = Role(name=name, is_system_role=is_system)
-                session.add(role)
-                roles_by_name[name] = role
-            session.flush()
-
-            permissions_by_code: dict[str, Permission] = {}
-            for code in DEFAULT_PERMISSIONS:
-                permission = Permission(code=code, description=code.replace(".", ": "))
-                session.add(permission)
-                permissions_by_code[code] = permission
-            session.flush()
-
-            admin_role = roles_by_name["Administrador General"]
-            for permission in permissions_by_code.values():
-                session.add(RolePermission(role=admin_role, permission_id=permission.id))
-
         admin_user = session.scalar(select(User).where(User.username == "admin"))
         if admin_user is None:
             session.add(
@@ -91,7 +54,7 @@ def seed(database_url: str) -> None:
                     username="admin",
                     password_hash=hasher.hash("admin123"),
                     full_name="Administrador",
-                    role_id=admin_role.id,
+                    role_id=admin_role_id,
                     is_active=True,
                 )
             )
