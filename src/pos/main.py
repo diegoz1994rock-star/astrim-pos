@@ -59,6 +59,11 @@ from pos.modules.products.presentation.products_view_model import ProductsViewMo
 from pos.modules.roles.application.role_management_service import RoleManagementService
 from pos.modules.roles.presentation.roles_view import RolesView
 from pos.modules.roles.presentation.roles_view_model import RolesViewModel
+from pos.modules.sales.application.sale_service import SalesService
+from pos.modules.sales.presentation.sale_view import SaleView
+from pos.modules.sales.presentation.sale_view_model import SaleViewModel
+from pos.modules.sales.presentation.sales_history_view import SalesHistoryView
+from pos.modules.sales.presentation.sales_history_view_model import SalesHistoryViewModel
 from pos.modules.settings.application.business_settings_service import BusinessSettingsService
 from pos.modules.suppliers.application.supplier_service import SupplierManagementService
 from pos.modules.suppliers.presentation.suppliers_view import SuppliersView
@@ -116,6 +121,15 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     container.register_singleton(SupplierManagementService, SupplierManagementService)
     container.register_singleton(
         CashRegisterService, lambda: CashRegisterService(event_bus)
+    )
+    container.register_singleton(
+        SalesService,
+        lambda: SalesService(
+            event_bus,
+            container.resolve(InventoryService),
+            container.resolve(CashRegisterService),
+            container.resolve(CustomerManagementService),
+        ),
     )
 
     # Registro de manejadores de eventos entre módulos (ver ARCHITECTURE.md
@@ -180,6 +194,37 @@ def _build_cash_register_content(container: Container) -> QWidget:
     return CashRegisterView(CashRegisterViewModel(cash_register_service, session_manager))
 
 
+def _build_sales_content(container: Container) -> QWidget:
+    sales_service = container.resolve(SalesService)
+    product_service = container.resolve(ProductManagementService)
+    customer_service = container.resolve(CustomerManagementService)
+    inventory_service = container.resolve(InventoryService)
+    cash_register_service = container.resolve(CashRegisterService)
+    session_manager = container.resolve(SessionManager)
+
+    tabs = QTabWidget()
+    tabs.addTab(
+        SaleView(
+            SaleViewModel(
+                sales_service,
+                product_service,
+                customer_service,
+                inventory_service,
+                cash_register_service,
+                session_manager,
+            )
+        ),
+        "Nueva venta",
+    )
+    tabs.addTab(
+        SalesHistoryView(
+            SalesHistoryViewModel(sales_service, inventory_service, session_manager)
+        ),
+        "Historial",
+    )
+    return tabs
+
+
 def _build_third_parties_content(container: Container) -> QWidget:
     customer_service = container.resolve(CustomerManagementService)
     supplier_service = container.resolve(SupplierManagementService)
@@ -208,6 +253,7 @@ def _build_nav_panels(
         NavPanel(
             "Caja", "cash_register.manage", lambda: open_panel(_build_cash_register_content)
         ),
+        NavPanel("Ventas", "sales.create", lambda: open_panel(_build_sales_content)),
     ]
 
 

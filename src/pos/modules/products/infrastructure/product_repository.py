@@ -47,6 +47,17 @@ class ProductRepository:
     def list_taxes(self) -> list[Tax]:
         return list(self._session.scalars(select(Tax).where(Tax.is_active.is_(True))))
 
+    def get_taxes_for_product(self, product_id: int) -> list[Tax]:
+        """Tasas de impuesto asignadas a un producto, usado por Ventas para
+        calcular `tax_amount` de cada línea (no solo sus nombres)."""
+        return list(
+            self._session.scalars(
+                select(Tax)
+                .join(ProductTax, ProductTax.tax_id == Tax.id)
+                .where(ProductTax.product_id == product_id)
+            )
+        )
+
     def get_tax_codes(self, product_id: int) -> frozenset[str]:
         rows = self._session.execute(
             select(Tax.name)

@@ -44,7 +44,7 @@ class InventoryService:
                 for w in repo.list_warehouses()
             ]
 
-    def create_warehouse(self, *, name: str, location: str | None) -> WarehouseDTO:
+    def create_warehouse(self, *, name: str, location: str | None = None) -> WarehouseDTO:
         name = name.strip()
         if not name:
             raise BusinessRuleViolationError("El nombre de la bodega no puede estar vacío.")
@@ -66,6 +66,15 @@ class InventoryService:
             repo = InventoryRepository(session)
             for warehouse in repo.list_warehouses():
                 repo.ensure_stock_level(product_id, warehouse.id)
+
+    def get_available_quantity(self, product_id: int, warehouse_id: int) -> Decimal:
+        """Cantidad disponible de un producto en una bodega. Usado por
+        Ventas para validar stock suficiente antes de completar una venta
+        (llamada directa síncrona, no evento — ver ARCHITECTURE.md §5b)."""
+        with session_scope() as session:
+            repo = InventoryRepository(session)
+            stock_level = repo.get_stock_level(product_id, warehouse_id)
+            return stock_level.quantity if stock_level is not None else Decimal(0)
 
     def list_stock_overview(self) -> list[StockLevelDTO]:
         with session_scope() as session:

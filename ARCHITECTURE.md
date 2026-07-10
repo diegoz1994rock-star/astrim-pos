@@ -43,11 +43,20 @@ Widgets reutilizables (teclado táctil numérico, tabla con paginación, selecto
 
 ## 5. Comunicación entre módulos: bus de eventos interno
 
-Los módulos **no se importan entre sí directamente** salvo a través de sus interfaces de dominio publicadas. Cuando un módulo necesita reaccionar a algo que ocurre en otro (ej. Inventario debe descontar stock cuando Ventas registra una venta), el módulo origen publica un evento de dominio (`SaleCompletedEvent`) en el bus (`core/events`), y el módulo interesado se suscribe a él en su capa de infraestructura/aplicación.
+Los módulos **no importan la infraestructura de otro módulo directamente** (ver §12b), pero sí pueden depender de la capa `application` de otro módulo cuando esa dependencia es intencional y está documentada en MODULES.md (ej. Ventas depende de Inventario, Caja y Clientes). Cuando un módulo necesita reaccionar a algo que ocurre en otro sin que exista esa dependencia documentada (ej. Inventario inicializa el stock cuando Productos crea un producto nuevo), el módulo origen publica un evento de dominio en el bus (`core/events`) y el módulo interesado se suscribe a él — ver `InventoryProductEventHandlers` como referencia.
 
 Esto evita el acoplamiento circular clásico de un POS ("Ventas importa Inventario importa Ventas para devoluciones...") y hace posible desactivar o reemplazar un módulo (ej. Cocina, en un negocio que no es restaurante) sin romper el resto.
 
 Eventos son objetos inmutables simples (dataclasses) despachados de forma síncrona en el proceso local. Cuando el módulo de Sincronización esté activo, se suscribe también a estos eventos para propagarlos a otras estaciones.
+
+### 5b. Cuándo usar un evento vs. una llamada directa a otro servicio de aplicación
+
+No todo se resuelve con un evento. La regla:
+
+- **Efecto derivado, no crítico, tolerante a consistencia eventual** → evento. Ejemplo: crear el `StockLevel` en 0 cuando se crea un producto — si ese handler tardara un instante o incluso fallara una vez, no compromete ninguna operación de negocio en curso.
+- **Efecto que debe suceder atómicamente como parte de la misma operación de negocio, donde una falla debe abortar toda la operación** → llamada directa síncrona al servicio de aplicación del otro módulo, dejando que la excepción se propague. Ejemplo: al completar una venta, Ventas llama directamente a `InventoryService.register_exit(...)` (no hay stock suficiente → la venta no se completa), a `CashRegisterService` (no hay turno de caja abierto → la venta no se completa) y, si aplica, a `CustomerManagementService.register_credit_movement(...)` (excede el cupo → la venta no se completa). `SaleCompletedEvent` igual se publica al final, pero solo para consumidores de solo lectura que no deben poder bloquear la venta (Auditoría, Reportes, Notificaciones, Sincronización).
+
+**Limitación conocida y aceptada**: cada servicio de aplicación abre su propia transacción (`session_scope()`) de forma independiente — no existe hoy una transacción distribuida real entre, por ejemplo, la inserción de la venta y el descuento de inventario. Para mitigar el riesgo se valida todo lo posible *antes* de mutar nada (stock suficiente, turno abierto, cupo de crédito disponible) y se ordenan las mutaciones de la menos reversible a la más reversible. Si en el futuro esto demuestra ser insuficiente (más probable con Sincronización multi-estación real), la solución es un patrón saga/outbox explícito — no se implementa preventivamente sin evidencia de que se necesita.
 
 ## 6. Acceso a datos y ruta de migración a PostgreSQL/MySQL
 

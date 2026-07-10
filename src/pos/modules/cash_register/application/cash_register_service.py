@@ -73,6 +73,25 @@ class CashRegisterService:
             assert register is not None
             return _session_dto(cash_session, register.name)
 
+    def require_open_session(self, cash_session_id: int) -> None:
+        """Valida que `cash_session_id` exista y esté abierta.
+
+        Usado por Ventas para verificar la sesión de caja *antes* de
+        completar una venta, incluso cuando la venta no tiene componente en
+        efectivo (crédito/tarjeta 100%) — de lo contrario esa validación
+        solo ocurriría por accidente cuando `register_sale_movement` se
+        invoca, y nunca para ventas sin efectivo.
+        """
+        with session_scope() as session:
+            repo = CashRegisterRepository(session)
+            cash_session = repo.get_session(cash_session_id)
+            if cash_session is None:
+                raise NotFoundError(f"No existe la sesión de caja con id={cash_session_id}.")
+            if cash_session.status is not CashSessionStatus.OPEN:
+                raise BusinessRuleViolationError(
+                    "No se puede completar la venta: la sesión de caja no está abierta."
+                )
+
     def open_session(
         self, *, cash_register_id: int, opened_by_user_id: int, opening_amount: Decimal
     ) -> CashSessionDTO:
@@ -131,6 +150,61 @@ class CashRegisterService:
                 amount=amount,
                 reason=reason,
                 created_by_user_id=created_by_user_id,
+            )
+
+    def register_sale_movement(self, *, cash_session_id: int, amount: Decimal) -> None:
+        """Registra el componente en efectivo de una venta completada.
+
+        Llamada directamente por `SalesService` (no vía evento) porque debe
+        formar parte de la misma operación atómica que completar la venta
+        — ver ARCHITECTURE.md §5b. Solo se llama con `amount > 0` (la parte
+        de la venta pagada en efectivo); pagos con tarjeta/transferencia no
+        afectan el efectivo físico de la caja.
+        """
+        if amount <= 0:
+            raise BusinessRuleViolationError(
+                "El monto de la venta en efectivo debe ser mayor que cero."
+            )
+
+        with session_scope() as session:
+            repo = CashRegisterRepository(session)
+            cash_session = repo.get_session(cash_session_id)
+            if cash_session is None:
+                raise NotFoundError(f"No existe la sesión de caja con id={cash_session_id}.")
+            if cash_session.status is not CashSessionStatus.OPEN:
+                raise BusinessRuleViolationError("La sesión de caja ya está cerrada.")
+
+            repo.add_movement(
+                cash_session_id=cash_session_id,
+                movement_type=CashMovementType.SALE,
+                amount=amount,
+                reason=None,
+                created_by_user_id=None,
+            )
+
+    def register_refund_movement(
+        self, *, cash_session_id: int, amount: Decimal, reason: str | None
+    ) -> None:
+        """Registra la salida de efectivo por la devolución de una venta anulada."""
+        if amount <= 0:
+            raise BusinessRuleViolationError("El monto a devolver debe ser mayor que cero.")
+
+        with session_scope() as session:
+            repo = CashRegisterRepository(session)
+            cash_session = repo.get_session(cash_session_id)
+            if cash_session is None:
+                raise NotFoundError(f"No existe la sesión de caja con id={cash_session_id}.")
+            if cash_session.status is not CashSessionStatus.OPEN:
+                raise BusinessRuleViolationError(
+                    "No se puede devolver efectivo: la sesión de caja ya está cerrada."
+                )
+
+            repo.add_movement(
+                cash_session_id=cash_session_id,
+                movement_type=CashMovementType.REFUND,
+                amount=amount,
+                reason=reason,
+                created_by_user_id=None,
             )
 
     def list_movements(self, cash_session_id: int) -> list[CashMovementDTO]:
