@@ -47,6 +47,7 @@ DEFAULT_PERMISSIONS = [
     "reports.view",
     "settings.manage",
     "licensing.manage",
+    "backups.manage",
 ]
 
 DEFAULT_BUSINESS_SETTINGS = [

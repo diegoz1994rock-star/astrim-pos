@@ -58,6 +58,19 @@ def get_engine() -> Engine:
     return _engine
 
 
+def dispose_engine() -> None:
+    """Cierra todas las conexiones pooleadas del engine sin invalidarlo.
+
+    Necesario antes de restaurar un backup (ver `BackupService.restore`):
+    reemplazar el archivo `.db` mientras hay conexiones SQLite abiertas
+    puede fallar o dejar la sesión en memoria apuntando a datos viejos. El
+    engine sigue siendo usable después: la siguiente `session_scope()` abre
+    una conexión nueva contra el archivo ya restaurado.
+    """
+    if _engine is not None:
+        _engine.dispose()
+
+
 @contextmanager
 def session_scope() -> Iterator[Session]:
     """Sesión transaccional: commit si todo sale bien, rollback ante excepción,

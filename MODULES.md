@@ -25,7 +25,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 | Reportes | `modules/reports/` | sales, inventory, cash_register, customers, users, billing | completo (parcial: ventas/productos/inventario/caja; clientes/usuarios/impuestos/ganancias pendientes) |
 | Configuración (panel admin) | `modules/settings/` | — | pendiente |
 | Licencias | `modules/licensing/` | — | completo |
-| Backups | `modules/backups/` | — | pendiente |
+| Backups | `modules/backups/` | — | completo |
 | Auditoría | `modules/audit/` | todos (suscriptor de eventos) | pendiente |
 | Notificaciones | `modules/notifications/` | kitchen, inventory, licensing | pendiente |
 | Sincronización / Servidor | `modules/sync/` | todos (suscriptor de eventos) | pendiente |
@@ -72,7 +72,7 @@ Leyenda de estado: `pendiente` · `en progreso` · `completo` · `fase posterior
 
 **Licencias** — Activación por clave, tipos (prueba/mensual/anual/permanente), validación robusta no dependiente solo del reloj del sistema (ver ARCHITECTURE.md §9), bloqueo elegante al expirar.
 
-**Backups** — Copias automáticas y manuales, restauración, exportación/importación, programación.
+**Backups** — Copias manuales y programadas (APScheduler + expresión cron) mediante `VACUUM INTO` para snapshots consistentes de SQLite, historial de ejecuciones y restauración con liberación previa del pool de conexiones (`dispose_engine()`), verificada sin necesidad de reiniciar la app.
 
 **Auditoría** — Bitácora append-only de acciones sensibles del sistema, historial de cambios, consumidor del bus de eventos.
 

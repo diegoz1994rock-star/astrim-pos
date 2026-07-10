@@ -56,6 +56,10 @@ python_version = "3.11"
 strict = true
 exclude = ["tests", "migrations"]
 
+[[tool.mypy.overrides]]
+module = "apscheduler.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 qt_api = "pyside6"

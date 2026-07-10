@@ -37,6 +37,10 @@ from pos.core.security.session import ActiveSession, SessionManager
 from pos.modules.auth.application.authentication_service import AuthenticationService
 from pos.modules.auth.presentation.login_view import LoginView
 from pos.modules.auth.presentation.login_view_model import LoginViewModel
+from pos.modules.backups.application.backup_service import BackupService
+from pos.modules.backups.application.scheduler import BackupScheduler
+from pos.modules.backups.presentation.backups_view import BackupsView
+from pos.modules.backups.presentation.backups_view_model import BackupsViewModel
 from pos.modules.cash_register.application.cash_register_service import CashRegisterService
 from pos.modules.cash_register.presentation.cash_register_view import CashRegisterView
 from pos.modules.cash_register.presentation.cash_register_view_model import (
@@ -145,6 +149,10 @@ def bootstrap_core(container: Container) -> BootstrapConfig:
     container.register_singleton(
         LicenseService, lambda: LicenseService(VENDOR_PUBLIC_KEY_B64, config.data_dir)
     )
+    container.register_singleton(
+        BackupService,
+        lambda: BackupService(config.database_url, config.data_dir / "backups"),
+    )
 
     # Registro de manejadores de eventos entre módulos (ver ARCHITECTURE.md
     # §5): Inventario reacciona a que Productos publique un producto nuevo.
@@ -244,6 +252,11 @@ def _build_reports_content(container: Container) -> QWidget:
     return ReportsView(ReportsViewModel(reports_service))
 
 
+def _build_backups_content(container: Container) -> QWidget:
+    backup_service = container.resolve(BackupService)
+    return BackupsView(BackupsViewModel(backup_service))
+
+
 def _build_license_content(container: Container) -> QWidget:
     license_service = container.resolve(LicenseService)
     return LicenseView(LicenseViewModel(license_service))
@@ -282,6 +295,7 @@ def _build_nav_panels(
         NavPanel(
             "Licencia", "licensing.manage", lambda: open_panel(_build_license_content)
         ),
+        NavPanel("Backups", "backups.manage", lambda: open_panel(_build_backups_content)),
     ]
 
 
@@ -385,9 +399,15 @@ def main() -> int:
     theme_manager = ThemeManager(app)
     container.register_instance(ThemeManager, theme_manager)
 
+    backup_scheduler = BackupScheduler(container.resolve(BackupService))
+    backup_scheduler.start()
+
     window = build_main_window(theme_manager, container)
     window.show()
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        backup_scheduler.shutdown()
 
 
 if __name__ == "__main__":

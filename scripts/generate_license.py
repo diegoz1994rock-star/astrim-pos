@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import argparse
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from pos.modules.licensing.domain.enums import LicenseType
@@ -38,7 +38,7 @@ def _cmd_keygen(_args: argparse.Namespace) -> None:
 def _cmd_issue(args: argparse.Namespace) -> None:
     private_key_b64 = Path(args.private_key_file).read_text().strip()
 
-    issued_at = datetime.now(timezone.utc)
+    issued_at = datetime.now(UTC)
     license_type = LicenseType(args.type)
     expires_at = None
     if license_type is not LicenseType.PERMANENT:
