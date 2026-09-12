@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema mínimo de la ventana Activity, antes de que Compose tome el
+         control del contenido (ver ui/theme/Theme.kt) — mismo criterio que
+         android/app/src/main/res/values/themes.xml (la app del POS): nunca
+         depende de com.google.android.material:material, solo Compose
+         Material3. -->
+    <style name="Theme.AstrimLicenseManager" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

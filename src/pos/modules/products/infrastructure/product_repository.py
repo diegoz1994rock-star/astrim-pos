@@ -4,18 +4,17 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session, aliased, selectinload
 
-from pos.modules.products.domain.enums import ProductType
+from pos.modules.products.domain.enums import ProductType, SaleUnit
 from pos.modules.products.infrastructure.models import (
     Category,
     Combo,
     ComboItem,
     Product,
-    ProductTax,
+    ProductBarcode,
     RecipeItem,
-    Tax,
 )
 
 
@@ -27,10 +26,37 @@ class ProductRepository:
         rows = self._session.execute(
             select(Product, Category.name)
             .outerjoin(Category, Category.id == Product.category_id)
+            .options(selectinload(Product.barcodes))
             .where(Product.is_deleted.is_(False))
             .order_by(Product.name)
         )
         return [(row[0], row[1]) for row in rows]
+
+    def list_tracked_active(self) -> list[tuple[Product, str | None]]:
+        """Productos activos que controlan inventario — usado por el módulo
+        de Inventario para poblar los selectores de Entrada/Salida/Ajuste/
+        Transferencia (no tiene sentido registrar movimientos de stock para
+        un producto inactivo o que no descuenta inventario)."""
+        rows = self._session.execute(
+            select(Product, Category.name)
+            .outerjoin(Category, Category.id == Product.category_id)
+            .options(selectinload(Product.barcodes))
+            .where(
+                Product.is_deleted.is_(False),
+                Product.is_active.is_(True),
+                Product.track_inventory.is_(True),
+            )
+            .order_by(Product.name)
+        )
+        return [(row[0], row[1]) for row in rows]
+
+    def get_names_by_ids(self, product_ids: list[int]) -> dict[int, str]:
+        if not product_ids:
+            return {}
+        rows = self._session.execute(
+            select(Product.id, Product.name).where(Product.id.in_(product_ids))
+        )
+        return dict(rows.all())
 
     def get(self, product_id: int) -> Product | None:
         return self._session.get(Product, product_id)
@@ -44,28 +70,6 @@ class ProductRepository:
         category = self._session.get(Category, category_id)
         return category.name if category is not None else None
 
-    def list_taxes(self) -> list[Tax]:
-        return list(self._session.scalars(select(Tax).where(Tax.is_active.is_(True))))
-
-    def get_taxes_for_product(self, product_id: int) -> list[Tax]:
-        """Tasas de impuesto asignadas a un producto, usado por Ventas para
-        calcular `tax_amount` de cada línea (no solo sus nombres)."""
-        return list(
-            self._session.scalars(
-                select(Tax)
-                .join(ProductTax, ProductTax.tax_id == Tax.id)
-                .where(ProductTax.product_id == product_id)
-            )
-        )
-
-    def get_tax_codes(self, product_id: int) -> frozenset[str]:
-        rows = self._session.execute(
-            select(Tax.name)
-            .join(ProductTax, ProductTax.tax_id == Tax.id)
-            .where(ProductTax.product_id == product_id)
-        )
-        return frozenset(row[0] for row in rows)
-
     def create(
         self,
         *,
@@ -78,6 +82,11 @@ class ProductRepository:
         cost_price: Decimal,
         unit_of_measure: str,
         track_inventory: bool,
+        image_path: str | None = None,
+        sale_unit: SaleUnit = SaleUnit.UNIT,
+        min_weight: Decimal | None = None,
+        max_weight: Decimal | None = None,
+        weight_decimal_places: int | None = None,
     ) -> Product:
         product = Product(
             sku=sku,
@@ -90,24 +99,83 @@ class ProductRepository:
             unit_of_measure=unit_of_measure,
             is_active=True,
             track_inventory=track_inventory,
+            image_path=image_path,
+            sale_unit=sale_unit,
+            min_weight=min_weight,
+            max_weight=max_weight,
+            weight_decimal_places=weight_decimal_places,
         )
         self._session.add(product)
         self._session.flush()
         return product
 
-    def set_taxes(self, product: Product, taxes: list[Tax]) -> None:
-        self._session.query(ProductTax).filter(ProductTax.product_id == product.id).delete()
-        for tax in taxes:
-            self._session.add(ProductTax(product_id=product.id, tax_id=tax.id))
+    def update(
+        self,
+        product: Product,
+        *,
+        sku: str,
+        name: str,
+        description: str | None,
+        category_id: int | None,
+        product_type: ProductType,
+        unit_price: Decimal,
+        cost_price: Decimal,
+        unit_of_measure: str,
+        track_inventory: bool,
+        image_path: str | None = None,
+        sale_unit: SaleUnit = SaleUnit.UNIT,
+        min_weight: Decimal | None = None,
+        max_weight: Decimal | None = None,
+        weight_decimal_places: int | None = None,
+    ) -> None:
+        product.sku = sku
+        product.name = name
+        product.description = description
+        product.category_id = category_id
+        product.product_type = product_type
+        product.unit_price = unit_price
+        product.cost_price = cost_price
+        product.image_path = image_path
+        product.unit_of_measure = unit_of_measure
+        product.track_inventory = track_inventory
+        product.sale_unit = sale_unit
+        product.min_weight = min_weight
+        product.max_weight = max_weight
+        product.weight_decimal_places = weight_decimal_places
         self._session.flush()
-
-    def get_taxes_by_names(self, names: set[str]) -> list[Tax]:
-        if not names:
-            return []
-        return list(self._session.scalars(select(Tax).where(Tax.name.in_(names))))
 
     def set_active(self, product: Product, is_active: bool) -> None:
         product.is_active = is_active
+
+    def has_recipe_or_combo_references(self, product_id: int) -> bool:
+        used_in_recipe = (
+            self._session.scalar(
+                select(RecipeItem.id).where(
+                    or_(
+                        RecipeItem.recipe_product_id == product_id,
+                        RecipeItem.ingredient_product_id == product_id,
+                    )
+                )
+            )
+            is not None
+        )
+        used_as_combo_component = (
+            self._session.scalar(select(ComboItem.id).where(ComboItem.product_id == product_id))
+            is not None
+        )
+        is_combo_with_items = (
+            self._session.scalar(
+                select(ComboItem.id)
+                .join(Combo, Combo.id == ComboItem.combo_id)
+                .where(Combo.product_id == product_id)
+            )
+            is not None
+        )
+        return used_in_recipe or used_as_combo_component or is_combo_with_items
+
+    def delete(self, product: Product) -> None:
+        product.is_deleted = True
+        product.is_active = False
 
     def add_recipe_item(
         self,
@@ -158,3 +226,43 @@ class ProductRepository:
             .where(ComboItem.combo_id == combo_id)
         )
         return [(row[0], row[1]) for row in rows]
+
+    # -- Códigos de barras ------------------------------------------------
+
+    def list_barcodes(self, product_id: int) -> list[ProductBarcode]:
+        return list(
+            self._session.scalars(
+                select(ProductBarcode)
+                .where(ProductBarcode.product_id == product_id)
+                .order_by(ProductBarcode.created_at)
+            )
+        )
+
+    def get_barcode_by_code(self, code: str) -> ProductBarcode | None:
+        return self._session.scalar(select(ProductBarcode).where(ProductBarcode.code == code))
+
+    def find_by_barcode(self, code: str) -> Product | None:
+        """`SELECT ... JOIN product_barcodes WHERE code = :code`, respaldado
+        por el índice único de `ProductBarcode.code` — fuente real que usa
+        Ventas al escanear, no una búsqueda lineal."""
+        return self._session.scalar(
+            select(Product).join(ProductBarcode).where(ProductBarcode.code == code)
+        )
+
+    def add_barcode(self, product_id: int, code: str) -> ProductBarcode:
+        barcode = ProductBarcode(product_id=product_id, code=code)
+        self._session.add(barcode)
+        self._session.flush()
+        return barcode
+
+    def update_barcode(self, barcode_id: int, code: str) -> ProductBarcode | None:
+        barcode = self._session.get(ProductBarcode, barcode_id)
+        if barcode is not None:
+            barcode.code = code
+            self._session.flush()
+        return barcode
+
+    def remove_barcode(self, barcode_id: int) -> None:
+        barcode = self._session.get(ProductBarcode, barcode_id)
+        if barcode is not None:
+            self._session.delete(barcode)

@@ -38,6 +38,12 @@ class OrderStatus(enum.Enum):
     READY = "ready"
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
+    ARCHIVED = "archived"
+    """Pedido ya entregado y confirmado desde Despacho ("Siguiente proceso"
+    presionado sobre un pedido `DELIVERED`) — deja de listarse en la cola
+    de Despacho (ver `RestaurantRepository.list_dispatch_queue`), igual
+    que `CANCELLED`, pero el registro se conserva íntegro para venta/
+    factura/historial/auditoría."""
 
 
 class OrderItemStatus(enum.Enum):
@@ -47,3 +53,15 @@ class OrderItemStatus(enum.Enum):
     PREPARING = "preparing"
     READY = "ready"
     DELIVERED = "delivered"
+
+
+class OrderOrigin(enum.Enum):
+    """Cómo se creó el pedido — dato de trazabilidad fijo, independiente del
+    estado de pago (que se deriva en vivo de `Order.sale_id`, ver
+    `RestaurantService.list_dispatch_queue`)."""
+
+    VENDEDOR = "vendedor"
+    """Tomado desde la pantalla Vendedor, sin cobrar todavía al crearse."""
+    VENTAS = "ventas"
+    """Creado automáticamente al completar una venta directo en Ventas, sin
+    pasar por un pedido de Vendedor — nace ya cobrado."""

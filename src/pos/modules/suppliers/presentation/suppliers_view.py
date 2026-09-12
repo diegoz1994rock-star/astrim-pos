@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -18,6 +17,10 @@ from PySide6.QtWidgets import (
 from pos.modules.suppliers.application.dto import SupplierDTO
 from pos.modules.suppliers.presentation.supplier_form_dialog import SupplierFormDialog
 from pos.modules.suppliers.presentation.suppliers_view_model import SuppliersViewModel
+from pos.shared_ui.widgets.scrollable_page import build_scrollable_page
+from pos.shared_ui.widgets.section_title import make_section_title
+from pos.shared_ui.widgets.table_utils import fit_table_to_contents
+from pos.shared_ui.widgets.toast import show_toast
 
 _COLUMNS = ["Razón social", "Contacto", "Documento", "Teléfono"]
 
@@ -31,14 +34,17 @@ class SuppliersView(QWidget):
         self._connect_signals()
         self._view_model.load()
 
+    def reload(self) -> None:
+        """Se llama al recuperar el foco de esta pestaña (ver `main.py`)."""
+        self._view_model.load()
+
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll_area, layout = build_scrollable_page(self)
+        outer.addWidget(scroll_area)
         toolbar = QHBoxLayout()
-        title = QLabel("Proveedores")
-        title_font = title.font()
-        title_font.setBold(True)
-        title_font.setPointSize(14)
-        title.setFont(title_font)
+        title = make_section_title("Proveedores")
         toolbar.addWidget(title)
         toolbar.addStretch()
         self._new_button = QPushButton("Nuevo proveedor")
@@ -70,6 +76,7 @@ class SuppliersView(QWidget):
             self._table.setItem(row, 1, QTableWidgetItem(supplier.contact_name or ""))
             self._table.setItem(row, 2, QTableWidgetItem(supplier.document_id or ""))
             self._table.setItem(row, 3, QTableWidgetItem(supplier.phone or ""))
+        fit_table_to_contents(self._table)
 
     def _on_new_clicked(self) -> None:
         dialog = SupplierFormDialog(self)
@@ -88,4 +95,4 @@ class SuppliersView(QWidget):
         QMessageBox.warning(self, "Error", message)
 
     def _show_info(self, message: str) -> None:
-        QMessageBox.information(self, "Listo", message)
+        show_toast(self, message)

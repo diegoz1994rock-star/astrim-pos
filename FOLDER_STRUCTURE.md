@@ -50,7 +50,6 @@ SUPER APP/
 │           ├── cash_register/        # Caja
 │           ├── restaurant/           # Mesas, pedidos, división de cuentas
 │           ├── kitchen/              # Pantalla de cocina
-│           ├── promotions/           # Promociones y descuentos
 │           ├── reports/              # Reportes y exportación PDF/Excel
 │           ├── settings/             # Configuración del negocio (panel admin)
 │           ├── licensing/            # Licencias

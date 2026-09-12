@@ -11,6 +11,7 @@ menor (APScheduler) frente a la decisión de negocio de qué se ejecuta.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -32,6 +33,11 @@ class BackupScheduler:
                 self._schedule_job(job.id, job.schedule_cron)
         self._scheduler.start()
 
+    def reschedule_job(self, job_id: int, cron_expression: str) -> None:
+        """Aplica de inmediato una programación nueva o editada desde la UI,
+        sin esperar a que la app se reinicie."""
+        self._schedule_job(job_id, cron_expression)
+
     def _schedule_job(self, job_id: int, cron_expression: str) -> None:
         try:
             trigger = CronTrigger.from_crontab(cron_expression)
@@ -52,6 +58,13 @@ class BackupScheduler:
         self._scheduler.add_job(
             _run, trigger=trigger, id=f"backup_job_{job_id}", replace_existing=True
         )
+
+    def get_next_run_time(self, job_id: int) -> datetime | None:
+        """Próxima ejecución programada del trabajo `job_id`, o `None` si
+        no hay ninguno registrado (usado por la tarjeta "Próximo backup
+        automático" de la pantalla de Backups)."""
+        job = self._scheduler.get_job(f"backup_job_{job_id}")
+        return job.next_run_time if job is not None else None
 
     def shutdown(self) -> None:
         self._scheduler.shutdown(wait=False)

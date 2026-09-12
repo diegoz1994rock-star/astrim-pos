@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 
 from pos.core.events.bus import EventBus
-from pos.core.exceptions import BusinessRuleViolationError
+from pos.core.exceptions import BusinessRuleViolationError, ConflictError, NotFoundError
 from pos.modules.cash_register.application.cash_register_service import CashRegisterService
 from pos.modules.cash_register.domain.enums import CashMovementType, CashSessionStatus
 from pos.modules.cash_register.domain.events import CashSessionClosedEvent, CashSessionOpenedEvent
@@ -154,3 +154,70 @@ def test_cannot_register_movement_on_closed_session(register_id: int, user_id: i
             reason=None,
             created_by_user_id=user_id,
         )
+
+
+def test_create_register_with_duplicate_name_raises_conflict(register_id: int) -> None:
+    service = CashRegisterService(EventBus())
+
+    with pytest.raises(ConflictError):
+        service.create_register(name="Caja Principal")
+
+
+def test_update_register_renames(register_id: int) -> None:
+    service = CashRegisterService(EventBus())
+
+    updated = service.update_register(register_id, name="Caja Renombrada")
+
+    assert updated.name == "Caja Renombrada"
+
+
+def test_update_register_with_duplicate_name_raises_conflict(register_id: int) -> None:
+    service = CashRegisterService(EventBus())
+    other = service.create_register(name="Caja 2")
+
+    with pytest.raises(ConflictError):
+        service.update_register(other.id, name="Caja Principal")
+
+
+def test_update_unknown_register_raises_not_found(sqlite_engine: None) -> None:
+    service = CashRegisterService(EventBus())
+
+    with pytest.raises(NotFoundError):
+        service.update_register(9999, name="No existe")
+
+
+def test_set_register_active_toggles_and_hides_from_active_list(register_id: int) -> None:
+    service = CashRegisterService(EventBus())
+
+    updated = service.set_register_active(register_id, False)
+
+    assert updated.is_active is False
+    assert all(r.id != register_id for r in service.list_registers())
+    assert any(r.id == register_id for r in service.list_all_registers())
+
+
+def test_delete_register_removes_it(register_id: int) -> None:
+    service = CashRegisterService(EventBus())
+
+    service.delete_register(register_id)
+
+    assert all(r.id != register_id for r in service.list_all_registers())
+
+
+def test_delete_unknown_register_raises_not_found(sqlite_engine: None) -> None:
+    service = CashRegisterService(EventBus())
+
+    with pytest.raises(NotFoundError):
+        service.delete_register(9999)
+
+
+def test_delete_register_with_sessions_raises_business_rule_violation(
+    register_id: int, user_id: int
+) -> None:
+    service = CashRegisterService(EventBus())
+    service.open_session(
+        cash_register_id=register_id, opened_by_user_id=user_id, opening_amount=Decimal("0")
+    )
+
+    with pytest.raises(BusinessRuleViolationError):
+        service.delete_register(register_id)

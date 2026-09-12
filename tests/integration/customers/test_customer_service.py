@@ -116,3 +116,53 @@ def test_remove_customer_soft_deletes(sqlite_engine: None) -> None:
     service.remove_customer(customer.id)
 
     assert customer.id not in {c.id for c in service.list_customers()}
+
+
+def test_remove_customer_with_pending_debt_is_rejected(sqlite_engine: None) -> None:
+    service = CustomerManagementService()
+    customer = service.create_customer(full_name="Con deuda", credit_limit=Decimal("100"))
+    service.register_credit_movement(
+        customer_id=customer.id, movement_type=CreditMovementType.CHARGE, amount=Decimal("40")
+    )
+
+    with pytest.raises(BusinessRuleViolationError):
+        service.remove_customer(customer.id)
+
+    assert customer.id in {c.id for c in service.list_customers()}
+
+
+def test_remove_customer_after_debt_paid_off_succeeds(sqlite_engine: None) -> None:
+    service = CustomerManagementService()
+    customer = service.create_customer(full_name="Saldado", credit_limit=Decimal("100"))
+    service.register_credit_movement(
+        customer_id=customer.id, movement_type=CreditMovementType.CHARGE, amount=Decimal("40")
+    )
+    service.register_credit_movement(
+        customer_id=customer.id, movement_type=CreditMovementType.PAYMENT, amount=Decimal("40")
+    )
+
+    service.remove_customer(customer.id)
+
+    assert customer.id not in {c.id for c in service.list_customers()}
+
+
+def test_clear_credit_history_rejects_when_debt_pending(sqlite_engine: None) -> None:
+    service = CustomerManagementService()
+    customer = service.create_customer(full_name="Con deuda", credit_limit=Decimal("100"))
+    service.register_credit_movement(
+        customer_id=customer.id, movement_type=CreditMovementType.CHARGE, amount=Decimal("40")
+    )
+
+    with pytest.raises(BusinessRuleViolationError):
+        service.clear_credit_history(customer.id)
+
+
+def test_clear_credit_history_succeeds_with_zero_debt(sqlite_engine: None) -> None:
+    service = CustomerManagementService()
+    customer = service.create_customer(full_name="Sin deuda")
+
+    service.clear_credit_history(customer.id)
+
+    reloaded = service.get_customer(customer.id)
+    assert reloaded is not None
+    assert reloaded.credit_history_cleared_at is not None

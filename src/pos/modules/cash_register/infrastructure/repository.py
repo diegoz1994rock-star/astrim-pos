@@ -27,14 +27,40 @@ class CashRegisterRepository:
             )
         )
 
+    def list_all_registers(self) -> list[CashRegister]:
+        return list(self._session.scalars(select(CashRegister).order_by(CashRegister.name)))
+
     def get_register(self, register_id: int) -> CashRegister | None:
         return self._session.get(CashRegister, register_id)
+
+    def get_register_by_name(self, name: str) -> CashRegister | None:
+        return self._session.scalar(select(CashRegister).where(CashRegister.name == name))
 
     def create_register(self, *, name: str, location: str | None) -> CashRegister:
         register = CashRegister(name=name, location=location, is_active=True)
         self._session.add(register)
         self._session.flush()
         return register
+
+    def update_register(self, register: CashRegister, *, name: str, location: str | None) -> None:
+        register.name = name
+        register.location = location
+        self._session.flush()
+
+    def set_register_active(self, register: CashRegister, is_active: bool) -> None:
+        register.is_active = is_active
+
+    def has_sessions(self, register_id: int) -> bool:
+        return (
+            self._session.scalar(
+                select(CashSession.id).where(CashSession.cash_register_id == register_id)
+            )
+            is not None
+        )
+
+    def delete_register(self, register: CashRegister) -> None:
+        self._session.delete(register)
+        self._session.flush()
 
     def get_open_session(self, register_id: int) -> CashSession | None:
         return self._session.scalar(

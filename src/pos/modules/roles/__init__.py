@@ -1,1 +1,0 @@
-"""Roles y permisos granulares."""

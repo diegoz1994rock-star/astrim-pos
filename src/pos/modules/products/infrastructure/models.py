@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pos.core.database.base import AuditedEntity, Base, TimestampMixin
-from pos.modules.products.domain.enums import ProductType
+from pos.modules.products.domain.enums import ProductType, SaleUnit
 
 
 class Category(Base, AuditedEntity):
@@ -38,13 +38,58 @@ class Product(Base, AuditedEntity):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     cost_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
     unit_of_measure: Mapped[str] = mapped_column(String(20), default="unidad", nullable=False)
+    sale_unit: Mapped[SaleUnit] = mapped_column(
+        Enum(SaleUnit, native_enum=False), default=SaleUnit.UNIT, server_default="unit", nullable=False
+    )
+    """Unidad o peso — campo obligatorio y explícito (reemplaza la
+    heurística de texto que existía antes sobre `unit_of_measure`)."""
+    min_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    max_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    """Solo tienen sentido cuando `sale_unit is SaleUnit.WEIGHT` — límites
+    de peso que `ScaleWeightDialog`/`SaleService` rechazan al vender (ver
+    `weight_reading.classify_reading`, `WeightReadingStatus.OUT_OF_RANGE`)."""
+    weight_decimal_places: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    """Si es `None`, se usa `ScaleDeviceConfig.decimal_places` de la
+    báscula activa al momento de pesar — permite que un producto puntual
+    (ej. algo que se vende en gramos exactos) anule la precisión general."""
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     track_inventory: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     """False para productos/servicios que no descuentan stock (ej. un servicio)."""
+    image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    """Ruta de la imagen del producto (ver `products/infrastructure/image_storage.py`),
+    reutilizada por Catálogo, Vendedor y Despacho — una sola imagen por
+    producto, nunca duplicada entre módulos."""
 
-    taxes: Mapped[list[ProductTax]] = relationship(
-        back_populates="product", cascade="all, delete-orphan"
+    barcodes: Mapped[list[ProductBarcode]] = relationship(
+        back_populates="product", cascade="all, delete-orphan", order_by="ProductBarcode.created_at"
     )
+    """Códigos de barras del producto — cero, uno o varios (proveedor A,
+    proveedor B, cambio de presentación...). Nunca una columna única en
+    esta tabla: ver `ProductBarcode`, la fuente única de verdad para
+    resolver un código escaneado a un producto (Ventas, Catálogo,
+    Inventario)."""
+
+
+class ProductBarcode(Base, TimestampMixin):
+    """Un código de barras de un producto. Relación uno-a-muchos real (no
+    una columna `barcode` en `Product`): un producto puede tener varios
+    códigos, pero cada código pertenece a un único producto — `code` es
+    único a nivel de toda la tabla, lo que además es el índice que hace
+    `find_by_barcode` prácticamente instantáneo sin importar cuántos
+    productos existan (ver `ProductRepository.find_by_barcode`)."""
+
+    __tablename__ = "product_barcodes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    """Texto exacto entregado por el lector, sin asumir ninguna simbología
+    (EAN-13/EAN-8/UPC-A/UPC-E/Code128/Code39/GS1/lo que sea) — se guarda
+    tal cual, sin normalizar longitud ni formato."""
+
+    product: Mapped[Product] = relationship(back_populates="barcodes")
 
 
 class RecipeItem(Base):
@@ -103,16 +148,3 @@ class Tax(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(60), nullable=False)
     rate_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
-
-class ProductTax(Base):
-    """Asociación producto ↔ impuesto aplicable."""
-
-    __tablename__ = "product_taxes"
-    __table_args__ = (UniqueConstraint("product_id", "tax_id", name="uq_product_tax"),)
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
-    tax_id: Mapped[int] = mapped_column(ForeignKey("taxes.id"), nullable=False)
-
-    product: Mapped[Product] = relationship(back_populates="taxes")

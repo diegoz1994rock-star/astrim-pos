@@ -1,0 +1,18 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+app/build/
+
+# Llave oficial de firma release y sus contraseñas — NUNCA commitear.
+# Ver keystore.properties (documentación de dónde vive/cómo se usa).
+keystore/
+keystore.properties
+*.jks
+*.keystore

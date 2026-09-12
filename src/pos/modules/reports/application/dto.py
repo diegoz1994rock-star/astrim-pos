@@ -14,6 +14,7 @@ class SalesReportRowDTO:
     status: str
     customer_name: str
     total: Decimal
+    register_name: str = "—"
 
 
 @dataclass(frozen=True)
@@ -72,3 +73,13 @@ class ProductSalesReportDTO:
     date_from: date
     date_to: date
     rows: list[ProductSalesRowDTO] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ChartPointDTO:
+    """Un punto de la gráfica de ventas/ganancias — `label` ya viene
+    formateado para el eje (día "dd/mm" o mes "mm/yyyy")."""
+
+    label: str
+    sales_total: Decimal
+    profit_total: Decimal

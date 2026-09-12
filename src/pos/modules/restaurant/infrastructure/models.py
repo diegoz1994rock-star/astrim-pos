@@ -15,6 +15,7 @@ from pos.core.database.base import Base, TimestampMixin, utc_now
 from pos.core.database.types import UTCDateTime
 from pos.modules.restaurant.domain.enums import (
     OrderItemStatus,
+    OrderOrigin,
     OrderStatus,
     OrderType,
     TableSessionStatus,
@@ -55,7 +56,8 @@ class TableSession(Base):
 
 class Order(Base, TimestampMixin):
     """Pedido. `table_session_id` es nulo para pedidos para llevar, a
-    domicilio o rápidos que no ocupan una mesa."""
+    domicilio o rápidos que no ocupan una mesa (ej. pantalla Vendedor sin
+    mesa asignada)."""
 
     __tablename__ = "orders"
 
@@ -69,6 +71,27 @@ class Order(Base, TimestampMixin):
     status: Mapped[OrderStatus] = mapped_column(
         Enum(OrderStatus, native_enum=False), default=OrderStatus.PENDING, nullable=False
     )
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    """Quién tomó el pedido — necesario para pedidos sin `table_session_id`
+    (que ya traían `waiter_user_id`), para mostrar "Empleado" en Despacho."""
+    sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id"), nullable=True)
+    """Se completa cuando Caja cobra este pedido (ver `RestaurantService.
+    link_order_to_sale`) — mientras sea nulo, el pedido aparece en
+    "Pedidos pendientes de cobro"."""
+    customer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    """Nombre del cliente informado en Vendedor — nulo para pedidos
+    anteriores a este campo (se muestra "Consumidor Final" en su lugar,
+    ver `RestaurantService.DEFAULT_CUSTOMER_NAME`)."""
+    customer_document: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    origin: Mapped[OrderOrigin] = mapped_column(
+        Enum(OrderOrigin, native_enum=False), default=OrderOrigin.VENDEDOR, nullable=False
+    )
+    """Fijo desde la creación — no cambia aunque el pedido se cobre después
+    (el estado de pago se deriva de `sale_id`, no de `origin`)."""
+    dispatched_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    """Usuario que marcó el pedido completo como entregado en Despacho."""
 
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order", cascade="all, delete-orphan"

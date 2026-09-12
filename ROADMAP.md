@@ -24,7 +24,7 @@ Productos, Categorías, Inventario (entradas/salidas/lotes/vencimientos/alertas)
 Clientes, Proveedores.
 
 ## M7 — Operación de venta
-Ventas, Facturación/Impuestos, Promociones/Descuentos, Caja.
+Ventas, Facturación/Impuestos, Caja.
 
 ## M8 — Operación de restaurante
 Mesas y Pedidos, Cocina (KDS), Notificaciones.

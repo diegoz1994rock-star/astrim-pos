@@ -1,0 +1,20 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+app/build/
+/release/
+
+# Credenciales de la llave oficial de firma de ASTRIM (compartida con
+# android/) — NUNCA commitear. El .jks en sí vive en android/keystore/,
+# no acá; ver keystore.properties para la referencia relativa.
+keystore.properties
+keystore/
+*.jks
+*.keystore

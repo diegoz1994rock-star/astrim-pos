@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from pos.modules.restaurant.domain.enums import (
     OrderItemStatus,
+    OrderOrigin,
     OrderStatus,
     OrderType,
     TableSessionStatus,
@@ -77,9 +78,23 @@ class RestaurantRepository:
     # -- Pedidos ------------------------------------------------------------
 
     def create_order(
-        self, *, table_session_id: int | None, order_type: OrderType
+        self,
+        *,
+        table_session_id: int | None,
+        order_type: OrderType,
+        created_by_user_id: int | None = None,
+        customer_name: str | None = None,
+        customer_document: str | None = None,
+        origin: OrderOrigin = OrderOrigin.VENDEDOR,
     ) -> Order:
-        order = Order(table_session_id=table_session_id, order_type=order_type)
+        order = Order(
+            table_session_id=table_session_id,
+            order_type=order_type,
+            created_by_user_id=created_by_user_id,
+            customer_name=customer_name,
+            customer_document=customer_document,
+            origin=origin,
+        )
         self._session.add(order)
         self._session.flush()
         return order
@@ -98,8 +113,77 @@ class RestaurantRepository:
             )
         )
 
+    def list_pending_payment_orders(self) -> list[Order]:
+        """Pedidos sin cobrar todavía (`sale_id IS NULL`), para "Pedidos
+        pendientes de cobro" en Caja — no incluye pedidos anulados."""
+        return list(
+            self._session.scalars(
+                select(Order)
+                .options(selectinload(Order.items))
+                .where(Order.sale_id.is_(None), Order.status != OrderStatus.CANCELLED)
+                .order_by(Order.created_at)
+            )
+        )
+
+    def link_order_to_sale(self, order: Order, sale_id: int) -> None:
+        order.sale_id = sale_id
+
+    def get_last_ready_at_by_order(self, order_ids: list[int]) -> dict[int, datetime]:
+        """Última vez que un ítem de cada pedido llegó a `READY`, para
+        mostrar "Listo: HH:MM" en "Pedidos pendientes de cobro" — una sola
+        consulta agregada en vez de una por pedido."""
+        if not order_ids:
+            return {}
+        rows = self._session.execute(
+            select(OrderItem.order_id, func.max(OrderItemStatusHistory.changed_at))
+            .join(OrderItemStatusHistory, OrderItemStatusHistory.order_item_id == OrderItem.id)
+            .where(
+                OrderItem.order_id.in_(order_ids),
+                OrderItemStatusHistory.status == OrderItemStatus.READY,
+            )
+            .group_by(OrderItem.order_id)
+        ).all()
+        return {order_id: changed_at for order_id, changed_at in rows}
+
     def set_order_status(self, order: Order, status: OrderStatus) -> None:
         order.status = status
+
+    def set_dispatched_by_user(self, order: Order, user_id: int | None) -> None:
+        order.dispatched_by_user_id = user_id
+
+    def list_dispatch_queue(self, limit: int = 200) -> list[Order]:
+        """Pedidos para la pantalla Despacho, agrupados a nivel de pedido
+        (no de ítem) — a diferencia de `list_kitchen_queue`, incluye tanto
+        pedidos sin cobrar (Vendedor) como ya cobrados (Ventas, o Vendedor
+        ya facturado): el filtrado por pagado/entregado/origen es
+        responsabilidad de la vista, no de esta consulta (ver
+        `KitchenService.list_dispatch_queue`). `ARCHIVED` se excluye igual
+        que `CANCELLED` — es un pedido `DELIVERED` que el cajero ya sacó de
+        la cola con "Siguiente proceso"; sigue existiendo, solo deja de
+        listarse acá (ver `RestaurantService.advance_dispatch_status`)."""
+        return list(
+            self._session.scalars(
+                select(Order)
+                .options(selectinload(Order.items))
+                .where(Order.status.not_in([OrderStatus.CANCELLED, OrderStatus.ARCHIVED]))
+                .order_by(Order.created_at.desc())
+                .limit(limit)
+            )
+        )
+
+    def count_pending_orders(self) -> int:
+        """`COUNT` real sobre `orders` en estado `PENDING` únicamente — sin
+        traer filas a memoria. Única fuente de verdad para "cuántos
+        despachos están pendientes de preparar" (ver
+        `KitchenService.get_pending_dispatch_count`); no confundir con
+        `list_dispatch_queue`, que trae toda la cola activa (PENDING +
+        PREPARING + READY + DELIVERED) para la pantalla de Despacho."""
+        return (
+            self._session.scalar(
+                select(func.count()).select_from(Order).where(Order.status == OrderStatus.PENDING)
+            )
+            or 0
+        )
 
     def add_order_item(
         self, order: Order, *, product_id: int, quantity: int, notes: str | None
@@ -112,10 +196,14 @@ class RestaurantRepository:
     # -- Cola de cocina -------------------------------------------------------
 
     def list_kitchen_queue(self) -> list[OrderItem]:
+        """Ítems pendientes de despachar — excluye tanto los ya entregados
+        como los de pedidos ya cobrados (`Order.sale_id` no nulo), para que
+        pagar un pedido lo saque también de Despacho automáticamente."""
         return list(
             self._session.scalars(
                 select(OrderItem)
-                .where(OrderItem.status != OrderItemStatus.DELIVERED)
+                .join(Order)
+                .where(OrderItem.status != OrderItemStatus.DELIVERED, Order.sale_id.is_(None))
                 .order_by(OrderItem.id)
             )
         )

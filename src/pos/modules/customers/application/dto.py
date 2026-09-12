@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 
 
@@ -17,3 +18,4 @@ class CustomerDTO:
     credit_limit: Decimal
     current_debt: Decimal
     loyalty_points_balance: int
+    credit_history_cleared_at: datetime | None = None

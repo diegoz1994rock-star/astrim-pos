@@ -19,9 +19,11 @@ class SaleCompletedEvent(DomainEvent):
     sale_id: int
     total: Decimal
     customer_id: int | None
+    created_by_user_id: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class SaleVoidedEvent(DomainEvent):
     sale_id: int
     reason: str | None
+    voided_by_user_id: int | None = None

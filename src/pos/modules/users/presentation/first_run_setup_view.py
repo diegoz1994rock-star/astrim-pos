@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QLabel,
     QLineEdit,
@@ -15,7 +16,9 @@ from PySide6.QtWidgets import (
 )
 
 from pos.core.security.session import ActiveSession
+from pos.modules.settings.domain.business_type import BUSINESS_TYPE_LABELS, BusinessType
 from pos.modules.users.presentation.first_run_setup_view_model import FirstRunSetupViewModel
+from pos.shared_ui.widgets.section_title import make_section_title
 
 
 class FirstRunSetupView(QWidget):
@@ -40,12 +43,8 @@ class FirstRunSetupView(QWidget):
         card_layout.setSpacing(12)
         card_layout.setContentsMargins(32, 32, 32, 32)
 
-        title = QLabel("Bienvenido — configuración inicial", card)
+        title = make_section_title("Bienvenido — configuración inicial", card)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_font = title.font()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        title.setFont(title_font)
         title.setWordWrap(True)
         title.setFixedWidth(356)
 
@@ -60,6 +59,13 @@ class FirstRunSetupView(QWidget):
 
         self._business_name_edit = QLineEdit(card)
         self._business_name_edit.setPlaceholderText("Nombre del negocio (opcional)")
+
+        self._business_type_combo = QComboBox(card)
+        self._business_type_combo.setMaxVisibleItems(12)
+        for business_type in BusinessType:
+            self._business_type_combo.addItem(
+                BUSINESS_TYPE_LABELS[business_type], business_type
+            )
 
         self._username_edit = QLineEdit(card)
         self._username_edit.setPlaceholderText("Usuario del administrador")
@@ -88,6 +94,7 @@ class FirstRunSetupView(QWidget):
         card_layout.addWidget(title)
         card_layout.addWidget(subtitle)
         card_layout.addWidget(self._business_name_edit)
+        card_layout.addWidget(self._business_type_combo)
         card_layout.addWidget(self._username_edit)
         card_layout.addWidget(self._full_name_edit)
         card_layout.addWidget(self._password_edit)
@@ -106,6 +113,7 @@ class FirstRunSetupView(QWidget):
         self._error_label.setVisible(False)
         self._view_model.complete_setup(
             business_name=self._business_name_edit.text(),
+            business_type=self._business_type_combo.currentData(),
             admin_username=self._username_edit.text(),
             admin_full_name=self._full_name_edit.text(),
             admin_password=self._password_edit.text(),

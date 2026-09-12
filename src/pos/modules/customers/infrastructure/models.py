@@ -26,6 +26,14 @@ class Customer(Base, AuditedEntity):
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     credit_limit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
     loyalty_points_balance: Mapped[int] = mapped_column(default=0, nullable=False)
+    credit_history_cleared_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime, nullable=True
+    )
+    """Fecha de corte de "Borrar historial" (`CustomerManagementService.
+    clear_credit_history`, solo permitido con deuda en cero) — las
+    facturas/recibos anteriores a esta fecha se ocultan del historial de
+    deuda del cliente, nunca se borran (siguen intactos para Reportes/
+    Ganancias/Historial de Ventas)."""
 
 
 class CreditMovementType(enum.Enum):

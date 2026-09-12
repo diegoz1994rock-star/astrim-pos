@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
 from pos.modules.licensing.application.dto import LicenseVerificationDTO
 from pos.modules.licensing.domain.enums import LicenseVerificationResult
 from pos.modules.licensing.presentation.license_view_model import LicenseViewModel
+from pos.shared_ui.widgets.section_title import make_section_title
+from pos.shared_ui.widgets.toast import show_toast
 
 _STATUS_MESSAGES = {
     LicenseVerificationResult.VALID: "Licencia activa y vigente.",
@@ -36,6 +38,12 @@ _STATUS_MESSAGES = {
     LicenseVerificationResult.CLOCK_TAMPERING_DETECTED: (
         "Se detectó un cambio inusual en la fecha del sistema. "
         "Verifica la hora de tu equipo o contacta al proveedor."
+    ),
+    LicenseVerificationResult.SUSPENDED: (
+        "Tu licencia está suspendida. Contacta al proveedor."
+    ),
+    LicenseVerificationResult.BLOCKED: (
+        "Tu licencia está bloqueada. Contacta al proveedor."
     ),
 }
 
@@ -67,11 +75,7 @@ class LicenseView(QWidget):
         card_layout.setSpacing(12)
         card_layout.setContentsMargins(card_margin, card_margin, card_margin, card_margin)
 
-        title = QLabel("Licencia", card)
-        title_font = title.font()
-        title_font.setBold(True)
-        title_font.setPointSize(16)
-        title.setFont(title_font)
+        title = make_section_title("Licencia", card)
         card_layout.addWidget(title)
 
         self._status_label = QLabel(card)
@@ -80,7 +84,7 @@ class LicenseView(QWidget):
         card_layout.addWidget(self._status_label)
 
         fingerprint_instructions = QLabel(
-            "Identificador de este equipo (envíalo al proveedor para activar):", card
+            "Identificador de este equipo (útil para soporte técnico):", card
         )
         fingerprint_instructions.setWordWrap(True)
         fingerprint_instructions.setFixedWidth(content_width)
@@ -92,8 +96,21 @@ class LicenseView(QWidget):
         fingerprint_field.setCursorPosition(0)
         card_layout.addWidget(fingerprint_field)
 
+        prefix_instructions = QLabel("Prefijo para licencia:", card)
+        prefix_instructions.setWordWrap(True)
+        prefix_instructions.setFixedWidth(content_width)
+        prefix_instructions.setProperty("role", "secondary")
+        card_layout.addWidget(prefix_instructions)
+
+        prefix_field = QLineEdit(self._view_model.hardware_prefix, card)
+        prefix_field.setReadOnly(True)
+        prefix_field.setCursorPosition(0)
+        card_layout.addWidget(prefix_field)
+
         self._license_key_edit = QLineEdit(card)
-        self._license_key_edit.setPlaceholderText("Pega aquí tu clave de licencia")
+        self._license_key_edit.setPlaceholderText(
+            "Código de licencia (ej. XXXX-XXXX-ASTR-XXXX-XXXX-XXXX-XXXX)"
+        )
         card_layout.addWidget(self._license_key_edit)
 
         self._activate_button = QPushButton("Activar licencia", card)
@@ -123,4 +140,4 @@ class LicenseView(QWidget):
         QMessageBox.warning(self, "Error", message)
 
     def _show_info(self, message: str) -> None:
-        QMessageBox.information(self, "Listo", message)
+        show_toast(self, message)

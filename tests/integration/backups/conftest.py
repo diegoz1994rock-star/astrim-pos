@@ -13,7 +13,9 @@ import pytest
 import pos.core.database.session as session_module
 from pos.core.database import model_registry
 from pos.core.database.session import init_engine
+from pos.core.events.bus import EventBus
 from pos.modules.backups.application.backup_service import BackupService
+from pos.modules.settings.application.business_settings_service import BusinessSettingsService
 
 
 @dataclass(frozen=True)
@@ -32,7 +34,8 @@ def backups_env(tmp_path: Path) -> Iterator[BackupsFixtures]:
     model_registry.metadata.create_all(engine)
 
     backup_dir = tmp_path / "backups"
-    service = BackupService(database_url, backup_dir)
+    settings = BusinessSettingsService(EventBus())
+    service = BackupService(database_url, backup_dir, settings)
 
     yield BackupsFixtures(
         database_url=database_url, db_path=db_path, backup_dir=backup_dir, service=service

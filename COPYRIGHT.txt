@@ -1,0 +1,13 @@
+ASTRIM POS
+Copyright © 2026 ASTRIM. Todos los derechos reservados.
+
+Este software y su código fuente son propiedad de sus autores. No se concede
+ninguna licencia de uso, copia, modificación o distribución salvo que se
+acuerde por escrito con el titular de los derechos.
+
+Software de terceros
+ASTRIM POS utiliza y/o redistribuye componentes de terceros bajo sus propias
+licencias (MIT o dominio público). El detalle completo está en el archivo
+THIRD-PARTY-NOTICES.txt que se instala junto a la aplicación.
+
+Al continuar con la instalación, usted acepta estas condiciones.

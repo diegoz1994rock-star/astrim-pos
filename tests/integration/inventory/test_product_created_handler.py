@@ -33,7 +33,6 @@ def test_creating_a_tracked_product_initializes_stock_in_every_warehouse(
         cost_price=Decimal("5"),
         unit_of_measure="unidad",
         track_inventory=True,
-        tax_codes=set(),
     )
 
     overview = inventory_service.list_stock_overview()
@@ -62,7 +61,6 @@ def test_creating_a_non_tracked_product_does_not_create_stock(
         cost_price=Decimal("5"),
         unit_of_measure="unidad",
         track_inventory=False,
-        tax_codes=set(),
     )
 
     overview = inventory_service.list_stock_overview()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from pos.modules.sync.domain.enums import SyncLogStatus, SyncStationStatus
@@ -108,3 +108,20 @@ class SyncRepository:
 
     def count_pending_local_origin(self, *, origin_station_id: int, since: datetime) -> int:
         return len(self.list_local_origin_since(origin_station_id=origin_station_id, since=since))
+
+    def count_by_origin(self, *, origin_station_id: int) -> int:
+        return (
+            self._session.scalar(
+                select(func.count(SyncLog.id)).where(SyncLog.origin_station_id == origin_station_id)
+            )
+            or 0
+        )
+
+    def count_all(self) -> int:
+        return self._session.scalar(select(func.count(SyncLog.id))) or 0
+
+    def count_by_status(self, status: SyncLogStatus) -> int:
+        return (
+            self._session.scalar(select(func.count(SyncLog.id)).where(SyncLog.status == status))
+            or 0
+        )

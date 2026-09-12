@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from pos.modules.customers.infrastructure.models import (
@@ -56,13 +56,24 @@ class CustomerRepository:
         customer.is_deleted = is_deleted
 
     def get_current_debt(self, customer_id: int) -> Decimal:
-        last_movement = self._session.scalar(
-            select(CustomerCreditMovement)
-            .where(CustomerCreditMovement.customer_id == customer_id)
-            .order_by(CustomerCreditMovement.id.desc())
-            .limit(1)
+        """Suma en SQL cargos menos abonos, en vez de confiar en el
+        `balance_after` congelado de la fila con `id` más alto — con esa
+        derivación, dos movimientos concurrentes (dos estaciones) podían
+        pisarse: el que insertaba con `id` mayor "ganaba" y borraba
+        silenciosamente el efecto del otro sobre la deuda vigente. Sumando
+        en SQL, ambos movimientos cuentan sin importar el orden de commit."""
+        signed_amount = case(
+            (CustomerCreditMovement.movement_type == CreditMovementType.CHARGE,
+             CustomerCreditMovement.amount),
+            (CustomerCreditMovement.movement_type == CreditMovementType.PAYMENT,
+             -CustomerCreditMovement.amount),
+            else_=0,
         )
-        return last_movement.balance_after if last_movement is not None else Decimal(0)
+        return self._session.scalar(
+            select(func.coalesce(func.sum(signed_amount), 0)).where(
+                CustomerCreditMovement.customer_id == customer_id
+            )
+        )
 
     def add_credit_movement(
         self,

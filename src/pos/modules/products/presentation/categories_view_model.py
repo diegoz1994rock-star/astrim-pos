@@ -22,13 +22,22 @@ class CategoriesViewModel(QObject):
     def load(self) -> None:
         self.categories_loaded.emit(self._category_service.list_categories())
 
-    def create_category(self, name: str, parent_id: int | None) -> None:
+    def create_category(self, name: str) -> None:
         try:
-            self._category_service.create_category(name=name, parent_id=parent_id)
+            self._category_service.create_category(name=name)
         except DomainError as error:
             self.error_occurred.emit(str(error))
         else:
             self.operation_succeeded.emit(f"Categoría '{name}' creada.")
+            self.load()
+
+    def update_category(self, category_id: int, name: str) -> None:
+        try:
+            self._category_service.update_category(category_id, name=name)
+        except DomainError as error:
+            self.error_occurred.emit(str(error))
+        else:
+            self.operation_succeeded.emit(f"Categoría '{name}' actualizada.")
             self.load()
 
     def set_active(self, category_id: int, is_active: bool) -> None:
@@ -37,4 +46,13 @@ class CategoriesViewModel(QObject):
         except DomainError as error:
             self.error_occurred.emit(str(error))
         else:
+            self.load()
+
+    def delete_category(self, category_id: int) -> None:
+        try:
+            self._category_service.delete_category(category_id)
+        except DomainError as error:
+            self.error_occurred.emit(str(error))
+        else:
+            self.operation_succeeded.emit("Categoría eliminada correctamente.")
             self.load()

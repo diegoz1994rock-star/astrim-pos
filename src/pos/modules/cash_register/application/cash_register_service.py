@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from pos.core.database.session import session_scope
 from pos.core.events.bus import EventBus
-from pos.core.exceptions import BusinessRuleViolationError, NotFoundError
+from pos.core.exceptions import BusinessRuleViolationError, ConflictError, NotFoundError
 from pos.modules.cash_register.application.dto import (
     CashMovementDTO,
     CashRegisterDTO,
@@ -55,13 +55,59 @@ class CashRegisterService:
             repo = CashRegisterRepository(session)
             return [_register_dto(r) for r in repo.list_registers()]
 
+    def list_all_registers(self) -> list[CashRegisterDTO]:
+        with session_scope() as session:
+            repo = CashRegisterRepository(session)
+            return [_register_dto(r) for r in repo.list_all_registers()]
+
     def create_register(self, *, name: str, location: str | None = None) -> CashRegisterDTO:
         name = name.strip()
         if not name:
             raise BusinessRuleViolationError("El nombre del punto de caja es obligatorio.")
         with session_scope() as session:
             repo = CashRegisterRepository(session)
+            if repo.get_register_by_name(name) is not None:
+                raise ConflictError(f"Ya existe una caja llamada '{name}'.")
             return _register_dto(repo.create_register(name=name, location=location))
+
+    def update_register(
+        self, register_id: int, *, name: str, location: str | None = None
+    ) -> CashRegisterDTO:
+        name = name.strip()
+        if not name:
+            raise BusinessRuleViolationError("El nombre del punto de caja es obligatorio.")
+        with session_scope() as session:
+            repo = CashRegisterRepository(session)
+            register = repo.get_register(register_id)
+            if register is None:
+                raise NotFoundError(f"No existe la caja con id={register_id}.")
+            existing = repo.get_register_by_name(name)
+            if existing is not None and existing.id != register_id:
+                raise ConflictError(f"Ya existe una caja llamada '{name}'.")
+            repo.update_register(register, name=name, location=location)
+            return _register_dto(register)
+
+    def set_register_active(self, register_id: int, is_active: bool) -> CashRegisterDTO:
+        with session_scope() as session:
+            repo = CashRegisterRepository(session)
+            register = repo.get_register(register_id)
+            if register is None:
+                raise NotFoundError(f"No existe la caja con id={register_id}.")
+            repo.set_register_active(register, is_active)
+            return _register_dto(register)
+
+    def delete_register(self, register_id: int) -> None:
+        with session_scope() as session:
+            repo = CashRegisterRepository(session)
+            register = repo.get_register(register_id)
+            if register is None:
+                raise NotFoundError(f"No existe la caja con id={register_id}.")
+            if repo.has_sessions(register_id):
+                raise BusinessRuleViolationError(
+                    "No se puede eliminar: esta caja tiene turnos registrados. "
+                    "Podés desactivarla en su lugar."
+                )
+            repo.delete_register(register)
 
     def get_open_session(self, register_id: int) -> CashSessionDTO | None:
         with session_scope() as session:
@@ -70,6 +116,19 @@ class CashRegisterService:
             if cash_session is None:
                 return None
             register = repo.get_register(register_id)
+            assert register is not None
+            return _session_dto(cash_session, register.name)
+
+    def get_session(self, cash_session_id: int) -> CashSessionDTO | None:
+        """Resuelve una sesión de caja por id (no necesariamente abierta) —
+        usado por la factura para mostrar el nombre de la caja (`Sale.
+        cash_session_id`)."""
+        with session_scope() as session:
+            repo = CashRegisterRepository(session)
+            cash_session = repo.get_session(cash_session_id)
+            if cash_session is None:
+                return None
+            register = repo.get_register(cash_session.cash_register_id)
             assert register is not None
             return _session_dto(cash_session, register.name)
 

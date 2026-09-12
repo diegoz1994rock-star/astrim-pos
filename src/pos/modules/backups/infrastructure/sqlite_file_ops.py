@@ -8,9 +8,14 @@ sesiones ORM abiertas sería confuso y propenso a fugas de conexión.
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import sqlite3
+from datetime import datetime
 from pathlib import Path
+
+_METADATA_TABLE = "_pos_backup_metadata"
+_CHECKSUM_CHUNK_SIZE = 1024 * 1024
 
 
 def sqlite_path_from_url(database_url: str) -> Path:
@@ -80,3 +85,79 @@ def restore_database_from(backup_file: Path, target_db_path: Path) -> None:
 
     target_db_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(backup_file, target_db_path)
+
+
+def looks_like_pos_backup(file_path: Path) -> bool:
+    """Filtro real para "Buscar backups": no basta con ser un SQLite
+    legible (`is_valid_sqlite_database`), cualquier archivo `.db` ajeno al
+    sistema pasaría esa prueba. Además exige la tabla `backup_history` —
+    propia de este sistema, presente en toda base de datos real (y en las
+    de prueba, creadas con `metadata.create_all` en vez de migraciones
+    Alembic, que nunca generan `alembic_version`)."""
+    if not is_valid_sqlite_database(file_path):
+        return False
+    connection = sqlite3.connect(str(file_path))
+    try:
+        row = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'backup_history'"
+        ).fetchone()
+        return row is not None
+    finally:
+        connection.close()
+
+
+def write_backup_metadata(
+    destination_file: Path, *, app_version: str, created_at: datetime, origin: str
+) -> None:
+    """Escribe una tabla `_pos_backup_metadata` dentro del propio archivo
+    de backup, para que la versión/origen del backup sobrevivan aunque el
+    archivo se copie a otra instalación o se pierda el `BackupHistory`
+    original (ver `BackupService.import_backup_file`)."""
+    connection = sqlite3.connect(str(destination_file))
+    try:
+        connection.execute(
+            f"CREATE TABLE IF NOT EXISTS {_METADATA_TABLE} (key TEXT PRIMARY KEY, value TEXT)"
+        )
+        connection.executemany(
+            f"INSERT OR REPLACE INTO {_METADATA_TABLE} (key, value) VALUES (?, ?)",
+            [
+                ("app_version", app_version),
+                ("created_at", created_at.isoformat()),
+                ("origin", origin),
+            ],
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def read_backup_metadata(file_path: Path) -> dict[str, str]:
+    """Lee el metadato embebido por `write_backup_metadata`, si existe.
+    Devuelve `{}` para backups anteriores a esta funcionalidad o archivos
+    SQLite ajenos al sistema — nunca inventa un valor."""
+    if not is_valid_sqlite_database(file_path):
+        return {}
+    connection = sqlite3.connect(str(file_path))
+    try:
+        row = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (_METADATA_TABLE,),
+        ).fetchone()
+        if row is None:
+            return {}
+        rows = connection.execute(f"SELECT key, value FROM {_METADATA_TABLE}").fetchall()
+        return {key: value for key, value in rows}
+    except sqlite3.DatabaseError:
+        return {}
+    finally:
+        connection.close()
+
+
+def compute_sha256(file_path: Path) -> str:
+    """Checksum de integridad, calculado por bloques para no cargar
+    archivos grandes en memoria."""
+    digest = hashlib.sha256()
+    with file_path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(_CHECKSUM_CHUNK_SIZE), b""):
+            digest.update(chunk)
+    return digest.hexdigest()

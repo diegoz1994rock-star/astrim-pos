@@ -1,0 +1,235 @@
+ASTRIM POS - Aviso de software de terceros
+===========================================
+
+ASTRIM POS es software propietario (ver COPYRIGHT.txt). Para poder
+construirlo y ejecutarlo, utiliza y/o redistribuye en forma binaria las
+siguientes bibliotecas de terceros, cada una bajo su propia licencia
+open source. Estas licencias son independientes de la de ASTRIM POS y se
+citan aquí en cumplimiento de sus términos de atribución.
+
+Este archivo se genera a partir de las dependencias declaradas en
+pyproject.toml y de las bibliotecas que estas requieren en tiempo de
+ejecución. El texto completo de cada licencia también puede consultarse
+en los paquetes originales publicados en https://pypi.org.
+
+
+Resumen de componentes
+-----------------------
+
+Componente                 Licencia            Uso
+--------------------------  ------------------  -----------------------------
+Python 3                    PSF-2.0             Intérprete embebido en el .exe
+PySide6 / Qt for Python      LGPL-3.0            Interfaz gráfica (UI)
+Shiboken6                    LGPL-3.0            Generador de bindings de Qt
+SQLAlchemy                  MIT                 Acceso a base de datos (ORM)
+Alembic                     MIT                 Migraciones de esquema
+Mako                        MIT                 Motor de plantillas (Alembic)
+Pydantic / pydantic-core    MIT                 Validación de datos
+Argon2-CFFI                 MIT                 Hash de contraseñas
+argon2-cffi-bindings         MIT                 Bindings C nativos de Argon2
+cffi                        MIT                 Bindings C (Argon2-CFFI)
+pycparser                   BSD-3-Clause        Dependencia de cffi
+cryptography                Apache-2.0 / BSD-3  Cifrado y firmas
+OpenSSL                      Apache-2.0          Bundle nativo de `cryptography`
+                                                  (libcrypto-3.dll, libssl-3.dll)
+FastAPI                     MIT                 API de sincronización
+Starlette                   BSD-3-Clause        Base de FastAPI
+Uvicorn                     BSD-3-Clause        Servidor ASGI
+websockets                  BSD-3-Clause        Transporte de sincronización
+httptools                    MIT                 Parser HTTP de Uvicorn[standard]
+watchfiles                    MIT                 Dependencia de Uvicorn[standard]
+PyYAML                       MIT                 Dependencia de Uvicorn[standard]
+httpx                       BSD-3-Clause        Cliente HTTP
+httpcore                    BSD-3-Clause        Base de httpx
+h11                         MIT                 Base de httpcore/uvicorn
+anyio                       MIT                 Base async de httpx/Starlette
+certifi                     MPL-2.0             Paquete de certificados CA
+idna                        BSD-3-Clause        Codificación de dominios
+charset-normalizer            MIT                 Detección de codificación (httpx)
+click                       BSD-3-Clause         CLI de Uvicorn
+colorama                    BSD-3-Clause        Color en consola (Windows)
+ReportLab                   BSD-style           Generación de PDF (facturas)
+openpyxl                    MIT                 Exportación a Excel
+APScheduler                 MIT                 Tareas programadas (backups)
+tzlocal                     MIT                 Zona horaria local
+tzdata                      Apache-2.0          Base de datos de zonas horarias
+qrcode                      BSD-3-Clause        Generación de códigos QR
+python-barcode              MIT                 Generación de códigos de barras
+Pillow                      MIT-CMU (HPND)      Procesamiento de imágenes
+pyserial                    BSD-3-Clause        Comunicación con hardware serie
+greenlet                    MIT                 Dependencia de SQLAlchemy
+MarkupSafe                  BSD-3-Clause        Dependencia de Mako
+typing_extensions           PSF-2.0             Compatibilidad de tipado
+annotated-types             MIT                 Dependencia de Pydantic
+Microsoft Visual C++         Licencia MS          Runtime nativo (VCRUNTIME140*.dll,
+  Redistributable / UCRT                          ucrtbase.dll, api-ms-win-*.dll)
+
+
+Notas por licencia
+-------------------
+
+1) PySide6 / Qt for Python (incluye Shiboken6) — LGPL-3.0
+   Copyright (C) The Qt Company Ltd. y contribuidores.
+   PySide6 y su generador de bindings Shiboken6 se distribuyen bajo la
+   Licencia Pública General Reducida de GNU versión 3 (LGPLv3). ASTRIM
+   POS los utiliza mediante enlazado dinámico, sin modificar su código
+   fuente. Conforme a la LGPLv3, el usuario final tiene derecho a
+   reemplazar la copia de Qt/PySide6/Shiboken6 incluida por una versión
+   compatible propia. El código fuente de Qt, PySide6 y Shiboken6 está
+   disponible públicamente en https://www.qt.io/,
+   https://pypi.org/project/PySide6/ y
+   https://pypi.org/project/shiboken6/. El texto completo de la licencia
+   puede consultarse en https://www.gnu.org/licenses/lgpl-3.0.html.
+
+2) Licencias MIT (SQLAlchemy, Alembic, Mako, Pydantic, pydantic-core,
+   Argon2-CFFI, argon2-cffi-bindings, cffi, FastAPI, h11, anyio,
+   httptools, watchfiles, PyYAML, charset-normalizer, openpyxl,
+   APScheduler, tzlocal, python-barcode, Pillow*, greenlet,
+   annotated-types, etc.)
+
+   Copyright (c) de sus respectivos autores.
+   Se concede permiso, sin cargo, a cualquier persona que obtenga una
+   copia de este software y de los archivos de documentación asociados
+   (el "Software"), para utilizar el Software sin restricción, incluyendo
+   sin limitación los derechos de uso, copia, modificación, fusión,
+   publicación, distribución, sublicencia y/o venta de copias del
+   Software, y para permitir a las personas a quienes se les proporcione
+   el Software hacer lo mismo, sujeto a las siguientes condiciones:
+
+   El aviso de copyright anterior y este aviso de permiso se incluirán en
+   todas las copias o partes sustanciales del Software.
+
+   EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO,
+   EXPRESA O IMPLÍCITA, INCLUYENDO PERO NO LIMITADO A GARANTÍAS DE
+   COMERCIABILIDAD, IDONEIDAD PARA UN PROPÓSITO PARTICULAR Y NO
+   INFRACCIÓN. EN NINGÚN CASO LOS AUTORES O TITULARES DEL COPYRIGHT SERÁN
+   RESPONSABLES POR NINGÚN RECLAMO, DAÑO U OTRA RESPONSABILIDAD.
+
+   (*) Pillow se distribuye bajo la licencia HPND ("MIT-CMU"), de texto
+   equivalente al anterior.
+
+3) Licencias BSD-3-Clause (Starlette, Uvicorn, websockets, httpx,
+   httpcore, idna, click, colorama, qrcode, pyserial, MarkupSafe,
+   pycparser, etc.)
+
+   Copyright (c) de sus respectivos autores. Todos los derechos
+   reservados.
+   Redistribución y uso en formato fuente o binario, con o sin
+   modificación, están permitidos siempre que se cumplan las siguientes
+   condiciones:
+   a) Las redistribuciones del código fuente deben conservar el aviso de
+      copyright anterior, esta lista de condiciones y el siguiente
+      descargo de responsabilidad.
+   b) Las redistribuciones en formato binario deben reproducir el aviso
+      de copyright anterior, esta lista de condiciones y el siguiente
+      descargo de responsabilidad en la documentación y/u otros
+      materiales provistos con la distribución.
+   c) Ni el nombre del titular del copyright ni los nombres de sus
+      contribuidores pueden usarse para respaldar o promocionar productos
+      derivados de este software sin permiso previo por escrito.
+   ESTE SOFTWARE SE PROPORCIONA POR EL TITULAR DEL COPYRIGHT "TAL CUAL" Y
+   SIN GARANTÍA ALGUNA.
+
+4) cryptography — Apache-2.0 OR BSD-3-Clause (licencia dual, a elección
+   del que redistribuye)
+   Copyright (c) Individual contributors.
+   ASTRIM POS redistribuye este componente bajo los términos de la
+   licencia Apache 2.0, cuyo texto completo se encuentra en
+   https://www.apache.org/licenses/LICENSE-2.0.
+
+5) ReportLab — Licencia estilo BSD ("The ReportLab License")
+   Copyright (c) ReportLab Europe Ltd.
+   Se permite el uso, copia y redistribución en formato fuente o binario
+   con o sin modificación, sujeto a condiciones equivalentes a las de la
+   licencia BSD-3-Clause descrita en el punto 3. Texto completo en el
+   paquete original (reportlab/license.txt) o en
+   https://www.reportlab.com/.
+
+6) certifi — Mozilla Public License 2.0
+   Este paquete es un empaquetado del almacén de certificados raíz de
+   Mozilla. Texto completo en https://www.mozilla.org/en-US/MPL/2.0/.
+
+7) tzdata — Apache-2.0 (empaquetado de la IANA Time Zone Database, de
+   dominio público)
+   Texto completo en https://www.apache.org/licenses/LICENSE-2.0.
+
+8) typing_extensions — Python Software Foundation License 2.0
+   Texto completo en https://docs.python.org/3/license.html.
+
+9) Python — Python Software Foundation License 2.0
+   ASTRIM POS embebe el intérprete de Python (python3.dll / python31x.dll
+   y su biblioteca estándar) para poder ejecutarse sin requerir una
+   instalación previa de Python en el equipo del cliente. Copyright (c)
+   Python Software Foundation. Texto completo en
+   https://docs.python.org/3/license.html.
+
+10) OpenSSL — Apache-2.0
+    El paquete `cryptography` incluye binarios precompilados de OpenSSL
+    (libcrypto-3.dll, libssl-3.dll) para las operaciones criptográficas de
+    ASTRIM POS. Copyright (c) The OpenSSL Project. Texto completo en
+    https://www.openssl.org/source/license.html.
+
+11) Microsoft Visual C++ Redistributable / Universal CRT
+    ASTRIM POS incluye componentes redistribuibles del runtime de Visual
+    C++ y del Universal C Runtime de Windows (VCRUNTIME140.dll,
+    VCRUNTIME140_1.dll, ucrtbase.dll, archivos api-ms-win-*.dll),
+    necesarios para ejecutar aplicaciones nativas en Windows. Son
+    propiedad de Microsoft Corporation y se redistribuyen conforme a los
+    términos de licencia de Microsoft para dichos componentes (no son
+    software de código abierto). Más información en
+    https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files.
+
+
+Versiones validadas contra el instalador (dist/ASTRIM_POS)
+-------------------------------------------------------------
+Esta lista fue verificada componente por componente contra el contenido
+real de dist/ASTRIM_POS/_internal (salida de
+`pyinstaller installer/pos.spec`), no solo contra pyproject.toml:
+
+  PySide6              6.11.1
+  Shiboken6            6.11.1
+  SQLAlchemy           2.0.51
+  Alembic              (según pyproject.toml, >=1.13)
+  Pydantic             2.13.4
+  Argon2-CFFI          25.1.0
+  argon2-cffi-bindings 25.1.0
+  cryptography         50.0.0
+  websockets           17.0.1
+  click                8.4.2
+  httptools            0.8.0
+  watchfiles           1.2.0
+  PyYAML               6.0.3
+  charset-normalizer   3.4.9
+  APScheduler          3.11.3
+  tzlocal              5.4.4
+  tzdata               2026.3
+  MarkupSafe           3.0.3
+
+(Las demás dependencias directas — FastAPI, Starlette, uvicorn, httpx,
+httpcore, h11, anyio, certifi, idna, colorama, ReportLab, openpyxl,
+qrcode, python-barcode, Pillow, pyserial, greenlet, pycparser,
+typing_extensions, annotated-types — se confirmaron presentes en el
+bundle pero PyInstaller no conserva su metadata de versión (dist-info)
+dentro del ejecutable final; su versión de referencia es la fijada en
+pyproject.toml y la instalada en el entorno de build al momento de
+generar cada release.)
+
+Nota de higiene de build: la validación detectó que `mypy` y sus
+dependencias (mypy_extensions, ast_serialize, librt) y `setuptools` se
+colaban al instalador de forma no intencional — SQLAlchemy y Pydantic
+incluyen plugins opcionales para `mypy` (sqlalchemy.ext.mypy,
+pydantic.mypy) que ASTRIM POS nunca ejecuta, pero que el análisis
+estático de PyInstaller igual arrastraba al bundle. Se corrigió
+excluyéndolos explícitamente en installer/pos.spec (ver `excludes`);
+por eso no figuran como componentes redistribuidos en este aviso.
+
+
+Aviso adicional
+----------------
+La lista anterior corresponde a las dependencias directas declaradas por
+ASTRIM POS y a sus dependencias de tiempo de ejecución más relevantes. No
+incluye herramientas usadas solo durante el desarrollo o la construcción
+del instalador (pruebas, linters, verificación de tipos, empaquetado),
+que no se redistribuyen con la aplicación final.
+
+Ante cualquier consulta sobre licencias de terceros, contactar a ASTRIM.

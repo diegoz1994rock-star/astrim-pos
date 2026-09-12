@@ -20,8 +20,7 @@ def test_successful_login_emits_authenticated_signal(qtbot: QtBot) -> None:
         user_id=1,
         username="admin",
         full_name="Administrador",
-        role_id=1,
-        permission_codes=frozenset({"sales.create"}),
+        is_admin=True,
     )
     fake_service.login.return_value = fake_session
 

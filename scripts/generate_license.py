@@ -50,6 +50,12 @@ def _cmd_issue(args: argparse.Namespace) -> None:
         license_type=license_type,
         issued_at=issued_at,
         expires_at=expires_at,
+        company_name=args.company_name,
+        company_nit=args.company_nit,
+        allowed_users=args.allowed_users,
+        allowed_branches=args.allowed_branches,
+        allowed_registers=args.allowed_registers,
+        max_devices=args.max_devices,
     )
     license_key = build_license_key(payload, private_key_b64)
     print(license_key)
@@ -70,6 +76,17 @@ def main() -> None:
     )
     issue_parser.add_argument(
         "--days", type=int, default=30, help="Días de validez (ignorado para 'permanent')."
+    )
+    issue_parser.add_argument("--company-name", default=None)
+    issue_parser.add_argument("--company-nit", default=None)
+    issue_parser.add_argument("--allowed-users", type=int, default=None)
+    issue_parser.add_argument("--allowed-branches", type=int, default=None)
+    issue_parser.add_argument("--allowed-registers", type=int, default=None)
+    issue_parser.add_argument(
+        "--max-devices",
+        type=int,
+        default=1,
+        help="Cuántos equipos distintos pueden autorizarse bajo esta licencia.",
     )
     issue_parser.set_defaults(func=_cmd_issue)
 

@@ -14,3 +14,15 @@ class ProductType(enum.Enum):
     """Producto compuesto: tiene una receta de insumos (ver `RecipeItem`)."""
     COMBO = "combo"
     """Combo: agrupa otros productos vendidos como una sola línea (ver `ComboItem`)."""
+
+
+class SaleUnit(enum.Enum):
+    """Cómo se vende un producto — reemplaza la heurística de texto sobre
+    `unit_of_measure` que existía antes (ver `sale_view.py`, ya eliminada):
+    ahora es un campo explícito y obligatorio, no una adivinanza."""
+
+    UNIT = "unit"
+    """Por unidad: cantidad × precio, como martillo, varilla, taladro."""
+    WEIGHT = "weight"
+    """Por peso: se pesa en báscula (o se ingresa manualmente) y se cobra
+    peso × precio por kilogramo, como papa, cebolla, carne."""

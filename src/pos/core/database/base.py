@@ -7,7 +7,7 @@ documentada, de `AuditedEntity` (ver DATABASE.md, "Convenciones globales").
 from __future__ import annotations
 
 import uuid as uuid_lib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 
 from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -28,6 +28,31 @@ class Base(DeclarativeBase):
 def utc_now() -> datetime:
     """Hora actual en UTC, usada como valor por defecto de columnas de auditoría."""
     return datetime.now(UTC)
+
+
+def today_utc_bounds(reference: datetime | None = None) -> tuple[datetime, datetime]:
+    """Rango UTC (`created_at BETWEEN start AND end`) del día calendario de
+    HOY en hora **local**, no en UTC — una venta hecha a las 7pm en una
+    zona UTC-5 ya cae en el día UTC siguiente, así que anclar el corte a
+    medianoche-UTC (en vez de medianoche-local) dejaría fuera ventas que sí
+    son de hoy, o mezclaría ventas de dos días distintos. Toda columna
+    `UTCDateTime` se guarda siempre en UTC (ver `core/database/types.py`),
+    así que este es el único cálculo correcto para un filtro "hoy" contra
+    esas columnas.
+
+    `reference` es opcional — sin él usa la hora real del sistema
+    (`datetime.now().astimezone()`, hora local real del huso horario del
+    equipo). Con un `reference` aware explícito (ej. en pruebas), su propio
+    `tzinfo` se toma como "la zona horaria local" en vez de la del sistema
+    operativo, para que el resultado sea determinístico sin importar en
+    qué huso horario corra la prueba."""
+    local_now = reference if reference is not None else datetime.now().astimezone()
+    if local_now.tzinfo is None:
+        local_now = local_now.astimezone()
+    today_local = local_now.date()
+    start_local = datetime.combine(today_local, time.min, tzinfo=local_now.tzinfo)
+    end_local = datetime.combine(today_local, time.max, tzinfo=local_now.tzinfo)
+    return start_local.astimezone(UTC), end_local.astimezone(UTC)
 
 
 class UUIDMixin:

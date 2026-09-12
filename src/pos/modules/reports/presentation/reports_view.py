@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -18,12 +19,40 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from pos.modules.reports.application.dto import ChartPointDTO
 from pos.modules.reports.domain.enums import ReportFormat
 from pos.modules.reports.presentation.reports_view_model import ReportKind, ReportsViewModel
+from pos.shared_ui.theme.spacing import SPACING_SM, SPACING_XS
+from pos.shared_ui.theme.theme_manager import get_active_tokens
+from pos.shared_ui.widgets.scrollable_page import build_scrollable_page
+from pos.shared_ui.widgets.section_title import make_section_title
+from pos.shared_ui.widgets.simple_bar_chart import ChartSeriesPoint, SimpleBarChart
+from pos.shared_ui.widgets.table_utils import fit_table_to_contents
+from pos.shared_ui.widgets.toast import show_toast
+
+_CHART_PERIODS = ["Diario (últimos 30 días)", "Mensual (últimos 12 meses)"]
+_LEGEND_SWATCH_PX = 12
+
+
+def _legend_item(color_hex: str, text: str, parent: QWidget) -> QWidget:
+    """Par de swatch de color + texto para la leyenda del gráfico — antes
+    era un emoji de cuadrado de color (🟦/🟩), que no obedece al tema ni a
+    la familia de íconos del resto de la app (ver DESIGN_SYSTEM.md §10)."""
+    item = QWidget(parent)
+    layout = QHBoxLayout(item)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(SPACING_XS)
+    swatch = QFrame(item)
+    swatch.setFixedSize(_LEGEND_SWATCH_PX, _LEGEND_SWATCH_PX)
+    swatch.setStyleSheet(f"background-color: {color_hex}; border-radius: 2px;")
+    layout.addWidget(swatch)
+    layout.addWidget(QLabel(text, item))
+    return item
 
 
 class ReportsView(QWidget):
@@ -32,15 +61,23 @@ class ReportsView(QWidget):
         self._view_model = view_model
         self._build_ui()
         self._connect_signals()
+        self._on_chart_refresh_clicked()
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        title = QLabel("Reportes")
-        title_font = title.font()
-        title_font.setBold(True)
-        title_font.setPointSize(14)
-        title.setFont(title_font)
-        layout.addWidget(title)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.addWidget(make_section_title("Reportes"))
+
+        tabs = QTabWidget(self)
+        tabs.addTab(self._build_tables_tab(), "Tablas")
+        tabs.addTab(self._build_charts_tab(), "Gráficas")
+        outer_layout.addWidget(tabs)
+
+    def _build_tables_tab(self) -> QWidget:
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll_area, layout = build_scrollable_page(page)
+        outer.addWidget(scroll_area)
 
         controls = QHBoxLayout()
         self._kind_combo = QComboBox(self)
@@ -77,6 +114,37 @@ class ReportsView(QWidget):
         export_row.addWidget(self._export_pdf_button)
         export_row.addWidget(self._export_excel_button)
         layout.addLayout(export_row)
+        return page
+
+    def _build_charts_tab(self) -> QWidget:
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll_area, layout = build_scrollable_page(page)
+        outer.addWidget(scroll_area)
+
+        controls = QHBoxLayout()
+        controls.addWidget(QLabel("Período:"))
+        self._chart_period_combo = QComboBox(self)
+        self._chart_period_combo.addItems(_CHART_PERIODS)
+        controls.addWidget(self._chart_period_combo)
+        self._chart_refresh_button = QPushButton("Actualizar")
+        controls.addWidget(self._chart_refresh_button)
+        controls.addStretch()
+        layout.addLayout(controls)
+
+        legend = QHBoxLayout()
+        legend.setSpacing(SPACING_SM)
+        tokens = get_active_tokens()
+        legend.addWidget(_legend_item(tokens.primary, "Ventas", page))
+        legend.addWidget(_legend_item(tokens.success, "Ganancias", page))
+        legend.addStretch(1)
+        layout.addLayout(legend)
+
+        self._chart = SimpleBarChart(self)
+        self._chart.setMinimumHeight(360)
+        layout.addWidget(self._chart)
+        return page
 
     def _connect_signals(self) -> None:
         self._generate_button.clicked.connect(self._on_generate_clicked)
@@ -84,7 +152,10 @@ class ReportsView(QWidget):
         self._export_excel_button.clicked.connect(
             lambda: self._on_export_clicked(ReportFormat.EXCEL)
         )
+        self._chart_refresh_button.clicked.connect(self._on_chart_refresh_clicked)
+        self._chart_period_combo.currentIndexChanged.connect(self._on_chart_refresh_clicked)
         self._view_model.report_ready.connect(self._on_report_ready)
+        self._view_model.chart_ready.connect(self._on_chart_ready)
         self._view_model.error_occurred.connect(self._show_error)
         self._view_model.operation_succeeded.connect(self._show_info)
 
@@ -105,6 +176,23 @@ class ReportsView(QWidget):
         for row_index, row in enumerate(rows):
             for col_index, value in enumerate(row):
                 self._table.setItem(row_index, col_index, QTableWidgetItem(value))
+        fit_table_to_contents(self._table)
+
+    def _on_chart_refresh_clicked(self) -> None:
+        monthly = self._chart_period_combo.currentIndex() == 1
+        today = date.today()
+        date_from = date(today.year - 1, today.month, 1) if monthly else today - timedelta(days=30)
+        self._view_model.generate_chart(monthly, date_from, today)
+
+    def _on_chart_ready(self, points: list[ChartPointDTO]) -> None:
+        self._chart.set_data(
+            [
+                ChartSeriesPoint(
+                    label=point.label, sales_total=point.sales_total, profit_total=point.profit_total
+                )
+                for point in points
+            ]
+        )
 
     def _on_export_clicked(self, report_format: ReportFormat) -> None:
         extension = "pdf" if report_format is ReportFormat.PDF else "xlsx"
@@ -119,4 +207,4 @@ class ReportsView(QWidget):
         QMessageBox.warning(self, "Error", message)
 
     def _show_info(self, message: str) -> None:
-        QMessageBox.information(self, "Listo", message)
+        show_toast(self, message)

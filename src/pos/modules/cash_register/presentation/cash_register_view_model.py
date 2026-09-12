@@ -10,10 +10,14 @@ from pos.core.exceptions import DomainError
 from pos.core.security.session import SessionManager
 from pos.modules.cash_register.application.cash_register_service import CashRegisterService
 from pos.modules.cash_register.domain.enums import CashMovementType
+from pos.modules.users.application.user_management_service import UserManagementService
 
 
 class CashRegisterViewModel(QObject):
     registers_loaded = Signal(list)
+    users_loaded = Signal(list)
+    """Emite la lista de `UserDTO` activos, para elegir quién opera cada
+    punto de caja durante el turno."""
     session_changed = Signal(object)
     """Emite `CashSessionDTO | None`: la sesión abierta del punto de caja
     seleccionado, o `None` si no hay ninguna."""
@@ -25,15 +29,20 @@ class CashRegisterViewModel(QObject):
         self,
         cash_register_service: CashRegisterService,
         session_manager: SessionManager,
+        user_management_service: UserManagementService,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._service = cash_register_service
         self._session_manager = session_manager
+        self._user_management_service = user_management_service
         self._selected_register_id: int | None = None
 
     def load(self) -> None:
         self.registers_loaded.emit(self._service.list_registers())
+        self.users_loaded.emit(
+            [user for user in self._user_management_service.list_users() if user.is_active]
+        )
 
     def select_register(self, register_id: int) -> None:
         self._selected_register_id = register_id
@@ -53,14 +62,14 @@ class CashRegisterViewModel(QObject):
         current = self._session_manager.current
         return current.user_id if current is not None else None
 
-    def open_session(self, opening_amount: Decimal) -> None:
+    def open_session(self, opening_amount: Decimal, operator_user_id: int) -> None:
         if self._selected_register_id is None:
             self.error_occurred.emit("Selecciona un punto de caja.")
             return
         try:
             self._service.open_session(
                 cash_register_id=self._selected_register_id,
-                opened_by_user_id=self._current_user_id() or 0,
+                opened_by_user_id=operator_user_id,
                 opening_amount=opening_amount,
             )
         except DomainError as error:
@@ -82,7 +91,7 @@ class CashRegisterViewModel(QObject):
                 movement_type=movement_type,
                 amount=amount,
                 reason=reason or None,
-                created_by_user_id=self._current_user_id(),
+                created_by_user_id=cash_session.opened_by_user_id,
             )
         except DomainError as error:
             self.error_occurred.emit(str(error))

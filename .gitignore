@@ -38,8 +38,12 @@ htmlcov/
 
 # Empaquetado
 installer/output/
+/release/
 *.exe
 *.msi
 
 # macOS
 .DS_Store
+
+# Config local de Claude Code (por máquina/usuario, no del proyecto)
+.claude/

@@ -16,7 +16,6 @@ from pos.modules.products.domain.enums import ProductType
 class ProductsViewModel(QObject):
     products_loaded = Signal(list)
     categories_loaded = Signal(list)
-    tax_names_loaded = Signal(list)
     error_occurred = Signal(str)
     operation_succeeded = Signal(str)
 
@@ -32,20 +31,30 @@ class ProductsViewModel(QObject):
 
     def load(self) -> None:
         self.categories_loaded.emit(self._category_service.list_categories())
-        self.tax_names_loaded.emit(self._product_service.list_tax_names())
         self._reload_products()
 
     def _reload_products(self) -> None:
         self.products_loaded.emit(self._product_service.list_products())
 
-    def create_product(self, **kwargs: object) -> None:
-        try:
-            self._product_service.create_product(**kwargs)  # type: ignore[arg-type]
-        except DomainError as error:
-            self.error_occurred.emit(str(error))
-        else:
-            self.operation_succeeded.emit("Producto creado correctamente.")
-            self._reload_products()
+    def create_product(self, **kwargs: object) -> ProductDTO:
+        """Puede lanzar `DomainError`: a diferencia del resto de los
+        métodos de este view model, este y `update_product` los dejan
+        propagar en vez de convertirlos en `error_occurred` — los llama
+        `ProductFormDialog` de forma síncrona para poder mostrar el error
+        junto al campo correspondiente sin cerrarse. Devuelve el DTO creado
+        para que el diálogo pueda aplicar los códigos de barras en espera
+        (no existe `product_id` hasta que la creación termina)."""
+        dto = self._product_service.create_product(**kwargs)  # type: ignore[arg-type]
+        self.operation_succeeded.emit("Producto creado correctamente.")
+        self._reload_products()
+        return dto
+
+    def update_product(self, product_id: int, **kwargs: object) -> ProductDTO:
+        """Puede lanzar `DomainError` — ver docstring de `create_product`."""
+        dto = self._product_service.update_product(product_id, **kwargs)  # type: ignore[arg-type]
+        self.operation_succeeded.emit("Producto actualizado correctamente.")
+        self._reload_products()
+        return dto
 
     def set_active(self, product: ProductDTO, is_active: bool) -> None:
         try:
@@ -53,6 +62,15 @@ class ProductsViewModel(QObject):
         except DomainError as error:
             self.error_occurred.emit(str(error))
         else:
+            self._reload_products()
+
+    def delete_product(self, product_id: int) -> None:
+        try:
+            self._product_service.delete_product(product_id)
+        except DomainError as error:
+            self.error_occurred.emit(str(error))
+        else:
+            self.operation_succeeded.emit("Producto eliminado correctamente.")
             self._reload_products()
 
     def add_recipe_item(

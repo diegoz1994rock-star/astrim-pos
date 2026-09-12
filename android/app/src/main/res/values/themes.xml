@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema mínimo de la ventana Activity, antes de que Compose tome el
+         control del contenido (ver ui/theme/Theme.kt) — a propósito no
+         depende de com.google.android.material:material (no se usa acá,
+         solo Compose Material3), así que hereda directo del tema
+         Material de plataforma, sin dependencias XML extra. -->
+    <style name="Theme.Astrim" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

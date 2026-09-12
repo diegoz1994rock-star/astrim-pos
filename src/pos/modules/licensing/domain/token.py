@@ -23,6 +23,17 @@ class LicenseTokenPayload:
     issued_at: datetime
     expires_at: datetime | None
     """`None` únicamente para licencias `PERMANENT`."""
+    company_name: str | None = None
+    company_nit: str | None = None
+    allowed_users: int | None = None
+    allowed_branches: int | None = None
+    allowed_registers: int | None = None
+    max_devices: int = 1
+    """Cuántos equipos distintos pueden estar autorizados simultáneamente
+    bajo esta licencia (ver `infrastructure/models.py::AuthorizedDevice`).
+    Todos los campos nuevos tienen valor por defecto para que una clave ya
+    emitida antes de que existieran siga firmando/verificando igual — la
+    firma se valida sobre los bytes ya guardados, nunca se recalcula."""
 
     def to_signable_bytes(self) -> bytes:
         data = asdict(self)
@@ -40,4 +51,26 @@ class LicenseTokenPayload:
             license_type=LicenseType(data["license_type"]),
             issued_at=datetime.fromisoformat(str(data["issued_at"])),
             expires_at=datetime.fromisoformat(str(expires_at_raw)) if expires_at_raw else None,
+            company_name=(
+                str(data["company_name"]) if data.get("company_name") is not None else None
+            ),
+            company_nit=(
+                str(data["company_nit"]) if data.get("company_nit") is not None else None
+            ),
+            allowed_users=(
+                int(data["allowed_users"])  # type: ignore[arg-type]
+                if data.get("allowed_users") is not None
+                else None
+            ),
+            allowed_branches=(
+                int(data["allowed_branches"])  # type: ignore[arg-type]
+                if data.get("allowed_branches") is not None
+                else None
+            ),
+            allowed_registers=(
+                int(data["allowed_registers"])  # type: ignore[arg-type]
+                if data.get("allowed_registers") is not None
+                else None
+            ),
+            max_devices=int(data.get("max_devices", 1)),  # type: ignore[arg-type]
         )

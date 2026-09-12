@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import Row, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from pos.modules.products.domain.enums import SaleUnit
 from pos.modules.sales.domain.enums import PaymentMethod, SaleStatus, SaleType
 from pos.modules.sales.infrastructure.models import Sale, SaleItem, SalePayment
+from pos.modules.scales.domain.enums import WeightEntrySource
 
 
 class SaleRepository:
@@ -22,6 +25,8 @@ class SaleRepository:
         cash_session_id: int | None,
         sale_type: SaleType,
         created_by_user_id: int | None,
+        customer_name: str | None = None,
+        customer_document: str | None = None,
     ) -> Sale:
         sale = Sale(
             customer_id=customer_id,
@@ -29,6 +34,8 @@ class SaleRepository:
             sale_type=sale_type,
             status=SaleStatus.DRAFT,
             created_by_user_id=created_by_user_id,
+            customer_name=customer_name,
+            customer_document=customer_document,
         )
         self._session.add(sale)
         self._session.flush()
@@ -44,15 +51,25 @@ class SaleRepository:
         discount_amount: Decimal,
         tax_amount: Decimal,
         line_total: Decimal,
+        note: str | None = None,
+        unit_cost: Decimal | None = None,
+        sale_unit: SaleUnit = SaleUnit.UNIT,
+        unit_of_measure: str = "unidad",
+        weight_entry_source: WeightEntrySource | None = None,
     ) -> SaleItem:
         item = SaleItem(
             sale_id=sale_id,
             product_id=product_id,
             quantity=quantity,
             unit_price=unit_price,
+            unit_cost=unit_cost,
             discount_amount=discount_amount,
             tax_amount=tax_amount,
             line_total=line_total,
+            note=note,
+            sale_unit=sale_unit,
+            unit_of_measure=unit_of_measure,
+            weight_entry_source=weight_entry_source,
         )
         self._session.add(item)
         self._session.flush()
@@ -109,3 +126,33 @@ class SaleRepository:
                 .limit(limit)
             )
         )
+
+    def sum_completed_total(self, start: datetime, end: datetime) -> Decimal:
+        """Total vendido en el rango — agregado en SQL (`func.sum`), nunca
+        sumando una lista de ventas traída a Python (Resumen Diario de
+        Ventas → Historial, ver `SalesService.get_daily_totals`)."""
+        return (
+            self._session.scalar(
+                select(func.coalesce(func.sum(Sale.total), 0)).where(
+                    Sale.status == SaleStatus.COMPLETED,
+                    Sale.created_at >= start,
+                    Sale.created_at <= end,
+                )
+            )
+            or Decimal(0)
+        )
+
+    def totals_by_cashier(self, start: datetime, end: datetime) -> list[Row]:
+        """Una fila `(created_by_user_id, total)` por cajero — `GROUP BY`
+        en SQL, mismo criterio de rendimiento que el resto del sistema
+        (nunca recorrer ventas en Python para sumarlas)."""
+        query = (
+            select(Sale.created_by_user_id, func.sum(Sale.total))
+            .where(
+                Sale.status == SaleStatus.COMPLETED,
+                Sale.created_at >= start,
+                Sale.created_at <= end,
+            )
+            .group_by(Sale.created_by_user_id)
+        )
+        return self._session.execute(query).all()

@@ -1,1 +1,1 @@
-"""Registro de ventas (POS): ítems, pagos, promociones y descuentos aplicados."""
+"""Registro de ventas (POS): ítems, pagos y descuentos aplicados."""

@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, String, Text
+from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pos.core.database.base import Base, TimestampMixin, utc_now
 from pos.core.database.types import UTCDateTime
-from pos.modules.backups.domain.enums import BackupStatus
+from pos.modules.backups.domain.enums import BackupOrigin, BackupStatus
 
 
 class BackupJob(Base, TimestampMixin):
@@ -43,3 +43,10 @@ class BackupHistory(Base):
     file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    origin: Mapped[BackupOrigin] = mapped_column(
+        Enum(BackupOrigin, native_enum=False), default=BackupOrigin.MANUAL, nullable=False
+    )
+    checksum_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    app_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_by_username: Mapped[str | None] = mapped_column(String(150), nullable=True)

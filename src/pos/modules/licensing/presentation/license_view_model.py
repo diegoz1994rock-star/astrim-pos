@@ -7,7 +7,10 @@ from PySide6.QtCore import QObject, Signal
 from pos.core.exceptions import DomainError
 from pos.modules.licensing.application.dto import LicenseVerificationDTO
 from pos.modules.licensing.application.license_service import LicenseService
-from pos.modules.licensing.infrastructure.hardware import get_hardware_fingerprint
+from pos.modules.licensing.infrastructure.hardware import (
+    format_hardware_prefix,
+    get_hardware_fingerprint,
+)
 
 
 class LicenseViewModel(QObject):
@@ -23,6 +26,15 @@ class LicenseViewModel(QObject):
     @property
     def hardware_fingerprint(self) -> str:
         return get_hardware_fingerprint()
+
+    @property
+    def hardware_prefix(self) -> str:
+        """Prefijo de 8 caracteres (`XXXX-XXXX`) que la app Android
+        antepone al código de licencia — se muestra solo como ayuda visual
+        para que el cliente confirme que el código que le mandaron
+        corresponde a este equipo; la validación real ocurre en
+        `LicenseService.activate`."""
+        return format_hardware_prefix(self.hardware_fingerprint)
 
     def refresh(self) -> LicenseVerificationDTO:
         verification = self._license_service.verify()

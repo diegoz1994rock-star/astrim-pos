@@ -14,7 +14,6 @@ import pos.core.database.session as session_module
 from pos.core.database import model_registry
 from pos.core.database.session import init_engine, session_scope
 from pos.modules.products.infrastructure.models import Product
-from pos.modules.roles.infrastructure.models import Role
 from pos.modules.users.infrastructure.models import User
 
 
@@ -37,14 +36,10 @@ class KitchenFixture:
 @pytest.fixture
 def kitchen_env(sqlite_engine: None) -> KitchenFixture:
     with session_scope() as session:
-        role = Role(name="Mesero", is_system_role=True)
-        session.add(role)
-        session.flush()
         user = User(
             username="mesero1",
             password_hash="x",
             full_name="Mesero Uno",
-            role_id=role.id,
             is_active=True,
         )
         session.add(user)

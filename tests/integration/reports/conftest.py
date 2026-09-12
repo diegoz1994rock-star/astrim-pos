@@ -21,7 +21,6 @@ from pos.modules.inventory.application.inventory_service import InventoryService
 from pos.modules.products.application.product_service import ProductManagementService
 from pos.modules.products.domain.enums import ProductType
 from pos.modules.reports.application.reports_service import ReportsService
-from pos.modules.roles.infrastructure.models import Role
 from pos.modules.sales.application.dto import SaleItemInput, SalePaymentInput
 from pos.modules.sales.application.sale_service import SalesService
 from pos.modules.sales.domain.enums import PaymentMethod
@@ -47,14 +46,10 @@ class ReportsFixtures:
 @pytest.fixture
 def reports_env(sqlite_engine: None, tmp_path: Path) -> ReportsFixtures:
     with session_scope() as session:
-        role = Role(name="Cajero", is_system_role=True)
-        session.add(role)
-        session.flush()
         user = User(
             username="cajero_reportes",
             password_hash="hash-no-relevante",
             full_name="Cajero Reportes",
-            role_id=role.id,
             is_active=True,
         )
         session.add(user)
@@ -86,7 +81,6 @@ def reports_env(sqlite_engine: None, tmp_path: Path) -> ReportsFixtures:
         cost_price=Decimal("500"),
         unit_of_measure="unidad",
         track_inventory=True,
-        tax_codes=set(),
     )
     inventory_service.register_entry(
         product_id=product.id,

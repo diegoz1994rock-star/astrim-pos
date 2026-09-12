@@ -51,6 +51,46 @@ def test_inventory_report_reflects_sale(reports_env: ReportsFixtures) -> None:
     assert row.quantity == Decimal("46")
 
 
+def test_product_profit_reflects_completed_sale(reports_env: ReportsFixtures) -> None:
+    """Ganancia = precio de venta − costo del catálogo, por unidad
+    vendida: 4 unidades × (1000 − 500) = 2000 (ver fixture `REP-1`)."""
+    profit = reports_env.reports_service.product_profit(reports_env.today, reports_env.today)
+
+    assert profit == Decimal("2000")
+
+
+def test_product_profit_outside_range_is_zero(reports_env: ReportsFixtures) -> None:
+    yesterday = reports_env.today - timedelta(days=5)
+    earlier = yesterday - timedelta(days=5)
+
+    profit = reports_env.reports_service.product_profit(earlier, yesterday)
+
+    assert profit == Decimal(0)
+
+
+def test_sales_and_profit_chart_daily_includes_todays_bucket(
+    reports_env: ReportsFixtures,
+) -> None:
+    points = reports_env.reports_service.sales_and_profit_chart(
+        reports_env.today - timedelta(days=1), reports_env.today, monthly=False
+    )
+
+    assert len(points) == 1
+    assert points[0].sales_total == Decimal("4000")
+    assert points[0].profit_total == Decimal("2000")
+
+
+def test_sales_and_profit_chart_monthly_groups_by_month(reports_env: ReportsFixtures) -> None:
+    month_start = reports_env.today.replace(day=1)
+    points = reports_env.reports_service.sales_and_profit_chart(
+        month_start, reports_env.today, monthly=True
+    )
+
+    assert len(points) == 1
+    assert points[0].label == f"{reports_env.today:%Y-%m}"
+    assert points[0].sales_total == Decimal("4000")
+
+
 def test_cash_report_includes_closed_session(reports_env: ReportsFixtures) -> None:
     report = reports_env.reports_service.cash_report(reports_env.today, reports_env.today)
 

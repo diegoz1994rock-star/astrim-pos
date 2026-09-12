@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Puebla la base de datos con datos mínimos para poder arrancar la app:
-roles y permisos base, un usuario administrador, una bodega por defecto,
-un impuesto de ejemplo y los parámetros de negocio esenciales.
+catálogo de áreas y cargos, un usuario administrador, una bodega por
+defecto, un impuesto de ejemplo y los parámetros de negocio esenciales.
 
 No es un fixture de pruebas automatizadas (esas usan repositorios en
 memoria o SQLite en memoria propia, ver DEVELOPMENT_RULES.md); es para
@@ -21,8 +21,14 @@ from sqlalchemy import select
 from pos.core.database.session import init_engine, session_scope
 from pos.modules.cash_register.infrastructure.models import CashRegister
 from pos.modules.inventory.infrastructure.models import Warehouse
+from pos.modules.job_positions.application.system_bootstrap import (
+    ADMIN_AREA_NAME,
+    ADMIN_POSITION_NAME,
+    ensure_admin_position,
+    ensure_default_job_catalog,
+)
+from pos.modules.job_positions.infrastructure.repository import JobPositionRepository
 from pos.modules.products.infrastructure.models import Tax
-from pos.modules.roles.application.system_bootstrap import ensure_system_roles_and_permissions
 from pos.modules.settings.infrastructure.models import BusinessSetting, SettingValueType
 from pos.modules.users.infrastructure.models import User
 
@@ -36,17 +42,26 @@ DEFAULT_BUSINESS_SETTINGS = [
 def seed(database_url: str) -> None:
     """Inserta los datos base si aún no existen (idempotente por nombre/clave única).
 
-    Los roles y permisos base se crean vía `ensure_system_roles_and_permissions`
-    (misma función que usa el primer arranque real de la app empaquetada,
-    `main.py::show_first_run_setup`) — una sola fuente de verdad para esa
-    lista en vez de mantenerla duplicada aquí.
+    El catálogo de áreas y cargos se crea vía `ensure_default_job_catalog`/
+    `ensure_admin_position` (mismas funciones que usa el arranque real de
+    la app empaquetada, `main.py::bootstrap_core`) — una sola fuente de
+    verdad para esa lista en vez de mantenerla duplicada aquí.
     """
     init_engine(database_url)
     hasher = PasswordHasher()
 
-    admin_role_id = ensure_system_roles_and_permissions()
+    ensure_default_job_catalog()
+    ensure_admin_position()
 
     with session_scope() as session:
+        job_position_repo = JobPositionRepository(session)
+        admin_area = job_position_repo.get_area_by_name(ADMIN_AREA_NAME)
+        assert admin_area is not None
+        admin_position = job_position_repo.get_position_by_area_and_name(
+            admin_area.id, ADMIN_POSITION_NAME
+        )
+        assert admin_position is not None
+
         admin_user = session.scalar(select(User).where(User.username == "admin"))
         if admin_user is None:
             session.add(
@@ -54,7 +69,8 @@ def seed(database_url: str) -> None:
                     username="admin",
                     password_hash=hasher.hash("admin123"),
                     full_name="Administrador",
-                    role_id=admin_role_id,
+                    job_area_id=admin_area.id,
+                    job_position_id=admin_position.id,
                     is_active=True,
                 )
             )

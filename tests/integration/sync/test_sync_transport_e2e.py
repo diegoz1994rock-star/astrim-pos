@@ -25,6 +25,13 @@ from websockets.sync.client import connect
 _HELPER_SCRIPT = Path(__file__).parent / "_server_process.py"
 _SRC_DIR = Path(__file__).resolve().parents[3] / "src"
 _EPOCH = "1970-01-01T00:00:00+00:00"
+_TERMINATED_OK_CODES = (0, None, 1) if sys.platform == "win32" else (0, None, -15)
+"""Códigos de salida esperados tras `process.terminate()` — nunca indican
+un crash real, solo cómo el SO reporta "lo matamos nosotros": en POSIX,
+un proceso no manejado que recibe SIGTERM sale con -15; en Windows,
+`TerminateProcess` (lo que `Popen.terminate()` usa ahí) siempre reporta 1,
+nunca -15 (esa señal ni existe en Windows) — sin esto, cada prueba fallaba
+acá aunque el servidor real hubiera arrancado y respondido bien."""
 
 
 def _free_port() -> int:
@@ -79,7 +86,7 @@ def _run_server_station(db_path: Path, station_name: str, *, seed_event: bool):
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
-        if process.returncode not in (0, None, -15):
+        if process.returncode not in _TERMINATED_OK_CODES:
             output = process.stdout.read() if process.stdout else ""
             raise AssertionError(f"El proceso servidor falló: {output}")
 

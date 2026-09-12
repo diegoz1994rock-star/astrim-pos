@@ -39,3 +39,62 @@ class SyncStatusDTO:
     running: bool
     connected: bool
     pending_outbound_count: int
+    local_ip: str
+    websocket_url: str
+    uptime_seconds: float | None
+    last_error: str | None
+    sent_count: int
+    received_count: int
+    failed_count: int
+    connections_count: int
+    auto_start_enabled: bool
+
+
+@dataclass(frozen=True)
+class SyncConnectionDTO:
+    """Una conexión WebSocket viva (no un registro histórico — vive solo
+    mientras dura la conexión, ver `server/connection_registry.py`)."""
+
+    station_name: str
+    ip: str
+    port: int
+    connected_at: datetime
+    last_sync_at: datetime | None
+    app_version: str | None
+    latency_ms: float | None
+
+
+@dataclass(frozen=True)
+class SyncEventLogLineDTO:
+    """Una línea del registro operacional en memoria de la sesión actual
+    (arranque/parada/conexión/error) — distinto de `SyncLogEntryDTO`, que
+    es el historial de negocio persistido en `sync_log`."""
+
+    occurred_at: datetime
+    message: str
+
+
+@dataclass(frozen=True)
+class DiagnosticStepDTO:
+    label: str
+    passed: bool
+    detail: str | None = None
+
+
+@dataclass(frozen=True)
+class ServerProbeResultDTO:
+    """Resultado de "Probar servidor": cada paso corrido en orden, se
+    detiene en el primer paso que falla."""
+
+    success: bool
+    steps: tuple[DiagnosticStepDTO, ...]
+
+
+@dataclass(frozen=True)
+class WebSocketProbeResultDTO:
+    """Resultado de "Probar conexión WebSocket": handshake real contra una
+    URL, con el round-trip medido si tuvo éxito."""
+
+    success: bool
+    detail: str
+    latency_ms: float | None = None

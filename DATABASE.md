@@ -15,10 +15,13 @@ Visión conceptual del modelo de datos. Este documento se profundiza a nivel de 
 ## Mapa de entidades por dominio
 
 **Identidad y acceso**
-- `users`, `roles`, `permissions`, `role_permissions`, `user_sessions`, `login_attempts`.
+- `users` (incluye `emergency_phone`/`blood_type`/`address`, además de los datos de contacto y `photo_path` ya existentes), `user_documents` (archivos adjuntos por usuario — hoja de vida, documentos; `user_id` FK CASCADE, sin mixins de auditoría, solo visible en el formulario de edición de usuario, nunca en la tabla de Usuarios), `user_sessions`, `login_attempts`. No hay Roles/Permisos: la clasificación organizacional y el nivel de acceso viven en `job_areas`/`job_positions` (ver abajo). "Eliminar" un usuario intenta un borrado físico real; si hay historial de negocio que lo referencia (`sales`, `cash_register`, `restaurant`, `purchasing`, etc., ninguna con `ondelete`), en vez de fallar se lo desactiva y marca como eliminado lógicamente (mismas columnas de `SoftDeleteMixin`).
+
+**Áreas y cargos (único modelo organizacional y de acceso del sistema)**
+- `job_areas`, `job_positions` (`area_id → job_areas.id`, catálogo plano de dos niveles, no jerárquico como `categories`). El nombre de `job_positions.name` es único **por área** (`UniqueConstraint(area_id, name)`), no globalmente: el mismo cargo (ej. "Cajero", "Conductor") puede existir en áreas distintas a propósito. `job_positions.grants_full_access` (booleano) es `True` únicamente para "Administrador General" (área "Administración"): ese cargo ve todas las pantallas de la app (ver `main.py::build_welcome_widget`), y está protegido de ser eliminado del catálogo o de quedarse sin ningún usuario asignado (ver `JobPositionManagementService`/`UserManagementService.delete_user`). `users.job_area_id`/`users.job_position_id` son FKs nullable con `ON DELETE SET NULL`: el cargo es clasificación organizacional opcional (salvo la protección anterior), no debe bloquear su borrado del catálogo por haber sido asignado alguna vez.
 
 **Terceros**
-- `customers`, `customer_credit_movements`, `customer_loyalty_points`, `suppliers`.
+- `customers` (incluye `credit_history_cleared_at`: corte de "Borrar historial" en Clientes — nunca borra facturas/recibos, solo los oculta del historial de deuda a partir de esa fecha), `customer_credit_movements`, `customer_loyalty_points`, `suppliers`.
 
 **Catálogo**
 - `categories` (jerárquica, `parent_id` autorreferenciado), `products`, `product_variants` (si aplica), `recipes` (producto compuesto → insumos), `recipe_items`, `combos`, `combo_items`, `taxes`, `product_taxes`.
@@ -30,7 +33,10 @@ Visión conceptual del modelo de datos. Este documento se profundiza a nivel de 
 - `purchase_orders`, `purchase_order_items`, `purchase_receipts`.
 
 **Ventas y facturación**
-- `sales`, `sale_items`, `sale_payments` (múltiples medios de pago por venta), `invoices`, `promotions`, `promotion_rules`, `discounts_applied`.
+- `sales`, `sale_items`, `sale_payments` (múltiples medios de pago por venta), `invoices` (incluye `balance_due`: saldo pendiente de una factura de venta a crédito, 0 para facturas de contado — independiente del ledger agregado `customer_credit_movements`, ver "Terceros"; ambos se mantienen sincronizados porque cada uno tiene un único punto de escritura, ver `BillingService.generate_invoice`/`register_payment`; y `due_date`, fecha de vencimiento a 90 días desde la emisión, solo en facturas de crédito), `debt_payment_receipts` (recibo permanente de cada abono a una factura — nunca se borra: número secuencial, factura, monto, método de pago, caja, usuario, equipo y observación).
+
+**Pagos electrónicos (manuales)**
+- `qr_payment_configs` (nombre + `image_path` de un QR estático subido en Administración), `nequi_payment_configs` (número de Nequi; solo puede haber uno `is_active` a la vez), `bre_b_payment_configs` (llave Bre-B — celular/correo/documento/alfanumérica, se almacena tal cual sin validar formato). Los tres comparten `is_active`/`is_default`, sin campos de API/token/webhook: el cobro es 100% manual, el cajero confirma visualmente y la venta se registra como cualquier otra en `sale_payments` con `payment_method` QR/NEQUI/BRE_B (ver `PaymentMethod` en `sales/domain/enums.py`). Sin tabla de "transacciones" ni integración bancaria — ver MODULES.md.
 
 **Restaurante / Cocina**
 - `dining_tables`, `table_sessions` (ocupación de mesa), `orders`, `order_items`, `order_item_status_history` (pendiente/preparando/listo/entregado), `bill_splits`.
@@ -58,7 +64,8 @@ Visión conceptual del modelo de datos. Este documento se profundiza a nivel de 
 ```
 users ──< user_sessions
 users ──< login_attempts
-users >── roles ──< role_permissions >── permissions
+users >── job_areas
+users >── job_positions ──< job_areas
 
 customers ──< sales
 customers ──< customer_credit_movements
@@ -79,7 +86,7 @@ product_batches >── products
 sales >── customers
 sales ──< sale_items >── products
 sales ──< sale_payments
-sales ──< invoices
+sales ──< invoices ──< debt_payment_receipts
 sales >── cash_sessions
 
 dining_tables ──< table_sessions ──< orders ──< order_items >── products
@@ -105,10 +112,10 @@ licenses ──< license_verification_log
 ## Implementación (Fase 3 completada)
 
 - Los 54 modelos SQLAlchemy están implementados en `src/pos/modules/*/infrastructure/models.py`, registrados centralmente en `src/pos/core/database/model_registry.py`.
-- **Enums de estado**: se implementaron como `enum.Enum` de Python en `domain/enums.py` de cada módulo, mapeados con `sqlalchemy.Enum(..., native_enum=False)` — se almacenan como `VARCHAR` con `CHECK` constraint, portable entre SQLite/PostgreSQL/MySQL, sin necesitar una tabla de catálogo aparte para valores fijos que no cambian desde la UI (roles, permisos y promociones sí son configurables y por eso son tablas, no enums).
+- **Enums de estado**: se implementaron como `enum.Enum` de Python en `domain/enums.py` de cada módulo, mapeados con `sqlalchemy.Enum(..., native_enum=False)` — se almacenan como `VARCHAR` con `CHECK` constraint, portable entre SQLite/PostgreSQL/MySQL, sin necesitar una tabla de catálogo aparte para valores fijos que no cambian desde la UI (áreas/cargos sí son configurables y por eso son tablas, no enums).
 - **Montos monetarios**: `Numeric(12, 2)` (o `Numeric(14, 3)` para cantidades de inventario que pueden llevar decimales de peso/volumen), nunca `FLOAT`.
 - Primera migración Alembic generada y verificada de punta a punta (`migrations/versions/`): crea las 54 tablas sobre SQLite limpio sin errores.
-- Script de semilla `scripts/seed_demo_data.py`: roles predefinidos + permisos base, usuario `admin`, bodega principal, impuesto IVA de ejemplo, parámetros de negocio esenciales. Verificado end-to-end (migración + seed) contra una base SQLite real.
+- Script de semilla `scripts/seed_demo_data.py`: catálogo de áreas y cargos predefinido, usuario `admin` (cargo "Administrador General"), bodega principal, impuesto IVA de ejemplo, parámetros de negocio esenciales. Verificado end-to-end (migración + seed) contra una base SQLite real.
 - `ruff check` y `mypy --strict` pasan sin errores sobre todo `src/`.
 
 ## Pendiente (deuda consciente, no bloqueante)

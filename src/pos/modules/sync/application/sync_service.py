@@ -45,6 +45,7 @@ _PEER_URL_KEY = "sync_peer_url"
 _SERVER_PORT_KEY = "sync_server_port"
 _LAST_RECEIVED_AT_KEY = "sync_last_received_at"
 _LAST_PUSHED_AT_KEY = "sync_last_pushed_at"
+_AUTO_START_KEY = "sync_auto_start"
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
@@ -128,6 +129,15 @@ class SyncService:
     def get_local_station_name(self) -> str:
         return self._settings.get_str(_DEFAULT_STATION_NAME_KEY) or "Estación principal"
 
+    def get_local_station(self) -> SyncStationDTO | None:
+        """Lectura pura (a diferencia de `_ensure_local_station`, no crea
+        ni modifica nada) — usada por el diagnóstico "Probar servidor"
+        para confirmar que la fila local quedó `ONLINE`."""
+        with session_scope() as session:
+            repo = SyncRepository(session)
+            row = repo.get_local_station()
+            return _station_to_dto(row) if row is not None else None
+
     def set_local_station_name(self, name: str) -> None:
         """Cambia el nombre configurado y, si la fila de estación local ya
         existe, la renombra en el momento (en vez de esperar a la próxima
@@ -168,6 +178,30 @@ class SyncService:
                     station.is_primary = is_primary
             return _station_to_dto(station)
 
+    def mark_local_station_online(self) -> SyncStationDTO:
+        """Marca la fila de *esta* estación como en línea — a diferencia de
+        `register_peer_station` (usado solo para pares remotos que se
+        conectan), este es el que corrige que la propia estación se
+        mostrara "Fuera de línea" para siempre: se llama desde
+        `SyncServer.start()` (una vez confirmado que el puerto quedó
+        escuchando) y desde `SyncClient` al conectar con éxito."""
+        self._ensure_local_station()
+        with session_scope() as session:
+            repo = SyncRepository(session)
+            row = repo.get_local_station()
+            assert row is not None
+            repo.set_station_status(row, status=SyncStationStatus.ONLINE, seen_at=datetime.now(UTC))
+            return _station_to_dto(row)
+
+    def mark_local_station_offline(self) -> None:
+        with session_scope() as session:
+            repo = SyncRepository(session)
+            row = repo.get_local_station()
+            if row is not None:
+                repo.set_station_status(
+                    row, status=SyncStationStatus.OFFLINE, seen_at=datetime.now(UTC)
+                )
+
     # -- Configuración -----------------------------------------------------
 
     def get_mode(self) -> SyncMode:
@@ -187,6 +221,14 @@ class SyncService:
 
     def set_server_port(self, port: int) -> None:
         self._settings.set_value(_SERVER_PORT_KEY, str(port), SettingValueType.NUMBER)
+
+    def get_auto_start_enabled(self) -> bool:
+        return self._settings.get_bool(_AUTO_START_KEY, True)
+
+    def set_auto_start_enabled(self, enabled: bool) -> None:
+        self._settings.set_value(
+            _AUTO_START_KEY, "true" if enabled else "false", SettingValueType.BOOLEAN
+        )
 
     # -- Marcas de agua del cliente (cursores de reanudación) ------------
 
@@ -307,9 +349,51 @@ class SyncService:
                 for entry in repo.list_recent(limit)
             ]
 
+    # -- Estadísticas --------------------------------------------------------
+
+    def count_sent(self) -> int:
+        """Eventos de origen local ya confirmados de enviarse (creados
+        antes del cursor `last_pushed_at`) — esta versión no rastrea *ack*
+        por evento individual (ver docstring del módulo), así que se
+        aproxima con el mismo cursor que ya usa `SyncClient` para saber
+        qué falta empujar."""
+        with session_scope() as session:
+            repo = SyncRepository(session)
+            local = repo.get_local_station()
+            if local is None:
+                return 0
+            total = repo.count_by_origin(origin_station_id=local.id)
+            pending = repo.count_pending_local_origin(
+                origin_station_id=local.id, since=self.get_last_pushed_at()
+            )
+            return max(0, total - pending)
+
+    def count_received(self) -> int:
+        with session_scope() as session:
+            repo = SyncRepository(session)
+            local = repo.get_local_station()
+            total = repo.count_all()
+            local_total = repo.count_by_origin(origin_station_id=local.id) if local else 0
+            return max(0, total - local_total)
+
+    def count_failed(self) -> int:
+        with session_scope() as session:
+            repo = SyncRepository(session)
+            return repo.count_by_status(SyncLogStatus.FAILED)
+
     # -- Estado para la UI -------------------------------------------------
 
-    def get_status(self, *, running: bool, connected: bool) -> SyncStatusDTO:
+    def get_status(
+        self,
+        *,
+        running: bool,
+        connected: bool,
+        local_ip: str,
+        websocket_url: str,
+        uptime_seconds: float | None,
+        last_error: str | None,
+        connections_count: int,
+    ) -> SyncStatusDTO:
         pending = len(self.list_local_origin_since(self.get_last_pushed_at()))
         return SyncStatusDTO(
             mode=self.get_mode(),
@@ -319,4 +403,13 @@ class SyncService:
             running=running,
             connected=connected,
             pending_outbound_count=pending,
+            local_ip=local_ip,
+            websocket_url=websocket_url,
+            uptime_seconds=uptime_seconds,
+            last_error=last_error,
+            sent_count=self.count_sent(),
+            received_count=self.count_received(),
+            failed_count=self.count_failed(),
+            connections_count=connections_count,
+            auto_start_enabled=self.get_auto_start_enabled(),
         )

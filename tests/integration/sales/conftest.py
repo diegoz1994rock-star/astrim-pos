@@ -19,8 +19,6 @@ from pos.modules.customers.application.customer_service import CustomerManagemen
 from pos.modules.inventory.application.inventory_service import InventoryService
 from pos.modules.products.application.product_service import ProductManagementService
 from pos.modules.products.domain.enums import ProductType
-from pos.modules.products.infrastructure.models import Tax
-from pos.modules.roles.infrastructure.models import Role
 from pos.modules.sales.application.sale_service import SalesService
 from pos.modules.users.infrastructure.models import User
 
@@ -40,7 +38,6 @@ class SalesFixtures:
     warehouse_id: int
     cash_session_id: int
     product_id: int
-    product_with_tax_id: int
     customer_id: int
     user_id: int
     sales_service: SalesService
@@ -53,14 +50,10 @@ class SalesFixtures:
 @pytest.fixture
 def sales_env(sqlite_engine: None) -> SalesFixtures:
     with session_scope() as session:
-        role = Role(name="Cajero", is_system_role=True)
-        session.add(role)
-        session.flush()
         user = User(
             username="cajero_ventas",
             password_hash="hash-no-relevante",
             full_name="Cajero de Ventas",
-            role_id=role.id,
             is_active=True,
         )
         session.add(user)
@@ -95,34 +88,9 @@ def sales_env(sqlite_engine: None) -> SalesFixtures:
         cost_price=Decimal("500"),
         unit_of_measure="unidad",
         track_inventory=True,
-        tax_codes=set(),
     )
     inventory_service.register_entry(
         product_id=product.id,
-        warehouse_id=warehouse.id,
-        quantity=Decimal("100"),
-        reason="Stock inicial de prueba",
-        created_by_user_id=None,
-    )
-
-    with session_scope() as session:
-        tax = Tax(name="IVA-TEST", rate_percent=Decimal("19"))
-        session.add(tax)
-
-    product_with_tax = product_service.create_product(
-        sku="VENTA-2",
-        name="Producto Con Impuesto",
-        description=None,
-        category_id=None,
-        product_type=ProductType.SIMPLE,
-        unit_price=Decimal("1000"),
-        cost_price=Decimal("500"),
-        unit_of_measure="unidad",
-        track_inventory=True,
-        tax_codes={"IVA-TEST"},
-    )
-    inventory_service.register_entry(
-        product_id=product_with_tax.id,
         warehouse_id=warehouse.id,
         quantity=Decimal("100"),
         reason="Stock inicial de prueba",
@@ -133,7 +101,6 @@ def sales_env(sqlite_engine: None) -> SalesFixtures:
         warehouse_id=warehouse.id,
         cash_session_id=cash_session.id,
         product_id=product.id,
-        product_with_tax_id=product_with_tax.id,
         customer_id=customer.id,
         user_id=user_id,
         sales_service=sales_service,

@@ -13,18 +13,21 @@ from datetime import UTC, datetime
 
 @dataclass(frozen=True)
 class ActiveSession:
-    """Snapshot inmutable del usuario autenticado y sus permisos efectivos."""
+    """Snapshot inmutable del usuario autenticado.
+
+    `is_admin` es `True` solo para el cargo "Administrador General"
+    (`JobPosition.grants_full_access`, ver `modules.job_positions`) — ese
+    cargo ve todas las pantallas habilitadas para el tipo de negocio, sin
+    restricción de permisos. Cualquier otro cargo ve solo los módulos para
+    los que tiene un código en `permission_codes` (otorgados desde la
+    pantalla "Áreas y cargos", ver `main.py::_panel_visible`)."""
 
     user_id: int
     username: str
     full_name: str
-    role_id: int
-    permission_codes: frozenset[str]
+    is_admin: bool
+    permission_codes: frozenset[str] = field(default_factory=frozenset)
     logged_in_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-
-    def has_permission(self, code: str) -> bool:
-        """Indica si la sesión tiene el permiso `code` (ver `roles.permissions`)."""
-        return code in self.permission_codes
 
 
 class SessionManager:

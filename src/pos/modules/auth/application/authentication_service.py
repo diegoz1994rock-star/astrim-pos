@@ -10,6 +10,8 @@ from __future__ import annotations
 import secrets
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy.orm import Session
+
 from pos.core.database.session import session_scope
 from pos.core.events.bus import EventBus
 from pos.core.exceptions import AccountLockedError, AuthenticationError
@@ -22,6 +24,8 @@ from pos.modules.auth.domain.events import (
     LogoutEvent,
 )
 from pos.modules.auth.infrastructure.repository import AuthRepository
+from pos.modules.job_positions.infrastructure.repository import JobPositionRepository
+from pos.modules.users.infrastructure.models import User
 
 _GENERIC_AUTH_ERROR_MESSAGE = "Usuario o contraseña incorrectos."
 """Mensaje deliberadamente genérico: no revela si el usuario existe o si
@@ -47,13 +51,47 @@ class AuthenticationService:
         self._max_failed_attempts = max_failed_attempts
         self._lockout_window = lockout_window
 
-    def login(self, username: str, password: str) -> ActiveSession:
-        """Autentica a `username` con `password`.
+    def _build_active_session(
+        self, user: User, session: Session, *, logged_in_at: datetime
+    ) -> ActiveSession:
+        """Resuelve `is_admin`/`permission_codes` desde el cargo del usuario
+        y arma el `ActiveSession` — compartido por `authenticate()` (login
+        con contraseña) y `get_session_for_token()` (validación de un token
+        ya emitido), para no repetir la resolución de permisos en dos
+        sitios."""
+        is_admin = False
+        permission_codes: frozenset[str] = frozenset()
+        if user.job_position_id is not None:
+            job_position_repo = JobPositionRepository(session)
+            position = job_position_repo.get_position(user.job_position_id)
+            is_admin = position is not None and position.grants_full_access
+            if not is_admin:
+                permission_codes = frozenset(
+                    job_position_repo.list_permission_codes(user.job_position_id)
+                )
+        return ActiveSession(
+            user_id=user.id,
+            username=user.username,
+            full_name=user.full_name,
+            is_admin=is_admin,
+            permission_codes=permission_codes,
+            logged_in_at=logged_in_at,
+        )
 
-        Lanza `AccountLockedError` si superó el máximo de intentos
-        fallidos en la ventana configurada, o `AuthenticationError` si las
-        credenciales son inválidas. En caso de éxito, deja la sesión
-        activa en `SessionManager` y la devuelve.
+    def authenticate(self, username: str, password: str) -> tuple[ActiveSession, str, datetime]:
+        """Verifica `username`/`password`, registra el intento y — si son
+        válidas — genera el token de sesión persistido (`UserSession`,
+        reutilizado ahora también por la API HTTP de negocio).
+
+        Deliberadamente NO activa `SessionManager` (a diferencia de
+        `login()`): `SessionManager` es la sesión del *proceso* de
+        escritorio — un cliente remoto autenticándose contra la API no debe
+        poder pisar la sesión de quien esté usando el escritorio en ese
+        mismo proceso. `login()` es un envoltorio de este método que sí la
+        activa, para el único llamador que la necesita (la UI de escritorio).
+
+        Lanza `AccountLockedError`/`AuthenticationError` en los mismos casos
+        que antes lanzaba `login()`. Devuelve `(sesión, token, expira_en)`.
         """
         now = datetime.now(UTC)
 
@@ -65,6 +103,8 @@ class AuthenticationService:
         # registrado (el bloqueo por intentos fallidos nunca se activaría).
         error_to_raise: AccountLockedError | AuthenticationError | None = None
         active_session: ActiveSession | None = None
+        token: str | None = None
+        expires_at = now + _SESSION_DURATION
 
         with session_scope() as session:
             repo = AuthRepository(session)
@@ -94,19 +134,8 @@ class AuthenticationService:
                     repo.touch_last_login(user, now)
 
                     token = secrets.token_urlsafe(32)
-                    repo.create_user_session(
-                        user_id=user.id, token=token, expires_at=now + _SESSION_DURATION
-                    )
-
-                    permission_codes = repo.get_permission_codes_for_role(user.role_id)
-                    active_session = ActiveSession(
-                        user_id=user.id,
-                        username=user.username,
-                        full_name=user.full_name,
-                        role_id=user.role_id,
-                        permission_codes=frozenset(permission_codes),
-                        logged_in_at=now,
-                    )
+                    repo.create_user_session(user_id=user.id, token=token, expires_at=expires_at)
+                    active_session = self._build_active_session(user, session, logged_in_at=now)
 
         if isinstance(error_to_raise, AccountLockedError):
             locked_until = now + self._lockout_window
@@ -121,11 +150,42 @@ class AuthenticationService:
             raise error_to_raise
 
         assert active_session is not None
-        self._session_manager.login(active_session)
+        assert token is not None
         self._event_bus.publish(
             LoginSucceededEvent(user_id=active_session.user_id, username=active_session.username)
         )
+        return active_session, token, expires_at
+
+    def login(self, username: str, password: str) -> ActiveSession:
+        """Autentica a `username` con `password` para la UI de escritorio.
+
+        Lanza `AccountLockedError` si superó el máximo de intentos
+        fallidos en la ventana configurada, o `AuthenticationError` si las
+        credenciales son inválidas. En caso de éxito, deja la sesión
+        activa en `SessionManager` y la devuelve — ver `authenticate()`
+        para la variante sin efecto sobre `SessionManager` que usa la API.
+        """
+        active_session, _token, _expires_at = self.authenticate(username, password)
+        self._session_manager.login(active_session)
         return active_session
+
+    def get_session_for_token(self, token: str) -> ActiveSession | None:
+        """Resuelve la `ActiveSession` de un token de la API HTTP, o `None`
+        si el token no existe, ya expiró, fue invalidado, o el usuario que lo
+        emitió ya no está activo — la validación de cada request de la API
+        (ver `sync/server/api/middleware.py`), nunca la sesión del escritorio.
+        """
+        now = datetime.now(UTC)
+        with session_scope() as session:
+            repo = AuthRepository(session)
+            user_session = repo.find_valid_session(token, now=now)
+            if user_session is None:
+                return None
+            user = repo.find_active_user_by_id(user_session.user_id)
+            if user is None:
+                return None
+            repo.touch_session_activity(user_session, now)
+            return self._build_active_session(user, session, logged_in_at=user_session.created_at)
 
     def logout(self) -> None:
         """Cierra la sesión activa, si hay alguna."""

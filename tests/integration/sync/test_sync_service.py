@@ -124,10 +124,22 @@ def test_list_since_excluding_station_omits_requesting_station(sync_env: SyncFix
     assert for_client_a[0].origin_station_name == "Servidor"
 
 
+def _status(sync_env: SyncFixtures, *, running: bool = False, connected: bool = False):
+    return sync_env.service.get_status(
+        running=running,
+        connected=connected,
+        local_ip="127.0.0.1",
+        websocket_url="ws://127.0.0.1:8765/ws/sync",
+        uptime_seconds=None,
+        last_error=None,
+        connections_count=0,
+    )
+
+
 def test_status_reports_pending_outbound_count(sync_env: SyncFixtures) -> None:
     sync_env.service.capture_event(_make_event())
 
-    status = sync_env.service.get_status(running=True, connected=False)
+    status = _status(sync_env, running=True, connected=False)
 
     assert status.pending_outbound_count == 1
     assert status.running is True
@@ -145,6 +157,61 @@ def test_register_and_offline_station_lifecycle(sync_env: SyncFixtures) -> None:
     from pos.modules.sync.domain.enums import SyncStationStatus
 
     assert offline.status is SyncStationStatus.OFFLINE
+
+
+def test_mark_local_station_online_fixes_the_local_row(sync_env: SyncFixtures) -> None:
+    """El bug raíz que hacía que la propia estación mostrara "Fuera de
+    línea" para siempre: `_ensure_local_station` (usado por
+    `capture_event`) nunca tocaba `status`, solo `mark_local_station_online`
+    lo hace de verdad."""
+    sync_env.service.set_local_station_name("Esta estación")
+    sync_env.service.capture_event(_make_event())
+    local_before = next(
+        s for s in sync_env.service.list_stations() if s.name == "Esta estación"
+    )
+    from pos.modules.sync.domain.enums import SyncStationStatus
+
+    assert local_before.status is SyncStationStatus.OFFLINE
+
+    sync_env.service.mark_local_station_online()
+
+    local_after = sync_env.service.get_local_station()
+    assert local_after is not None
+    assert local_after.status is SyncStationStatus.ONLINE
+
+    sync_env.service.mark_local_station_offline()
+
+    assert sync_env.service.get_local_station().status is SyncStationStatus.OFFLINE
+
+
+def test_count_sent_and_received(sync_env: SyncFixtures) -> None:
+    sync_env.service.set_local_station_name("Local")
+    sync_env.service.capture_event(_make_event(sku="sent-1"))
+    sync_env.service.capture_event(_make_event(sku="sent-2"))
+    sync_env.service.record_remote_event(
+        event_type="X",
+        entity_type="y",
+        entity_uuid="44444444-4444-4444-4444-444444444444",
+        payload_json="{}",
+        origin_station_name="Otra Estación",
+        created_at=datetime.now(UTC),
+    )
+
+    assert sync_env.service.count_received() == 1
+    assert sync_env.service.count_sent() == 0  # nada confirmado como enviado todavía
+
+    sync_env.service.set_last_pushed_at(datetime.now(UTC))
+
+    assert sync_env.service.count_sent() == 2
+    assert sync_env.service.count_failed() == 0
+
+
+def test_auto_start_enabled_defaults_true_and_round_trips(sync_env: SyncFixtures) -> None:
+    assert sync_env.service.get_auto_start_enabled() is True
+
+    sync_env.service.set_auto_start_enabled(False)
+
+    assert sync_env.service.get_auto_start_enabled() is False
 
 
 def test_last_received_and_pushed_watermarks_default_to_epoch(sync_env: SyncFixtures) -> None:

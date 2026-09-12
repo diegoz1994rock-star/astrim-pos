@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from pos.modules.inventory.domain.enums import StockMovementType
@@ -28,8 +28,14 @@ class InventoryRepository:
             )
         )
 
+    def list_all_warehouses(self) -> list[Warehouse]:
+        return list(self._session.scalars(select(Warehouse).order_by(Warehouse.name)))
+
     def get_warehouse(self, warehouse_id: int) -> Warehouse | None:
         return self._session.get(Warehouse, warehouse_id)
+
+    def get_warehouse_by_name(self, name: str) -> Warehouse | None:
+        return self._session.scalar(select(Warehouse).where(Warehouse.name == name))
 
     def create_warehouse(self, *, name: str, location: str | None) -> Warehouse:
         warehouse = Warehouse(name=name, location=location, is_active=True)
@@ -37,12 +43,31 @@ class InventoryRepository:
         self._session.flush()
         return warehouse
 
+    def update_warehouse(self, warehouse: Warehouse, *, name: str, location: str | None) -> None:
+        warehouse.name = name
+        warehouse.location = location
+        self._session.flush()
+
+    def set_warehouse_active(self, warehouse: Warehouse, is_active: bool) -> None:
+        warehouse.is_active = is_active
+
     def get_stock_level(self, product_id: int, warehouse_id: int) -> StockLevel | None:
         return self._session.scalar(
             select(StockLevel).where(
                 StockLevel.product_id == product_id, StockLevel.warehouse_id == warehouse_id
             )
         )
+
+    def get_total_available_quantity(self, product_id: int) -> Decimal:
+        """Suma de `StockLevel.quantity` en todas las bodegas para un
+        producto — la venta ya no valida contra una sola bodega, sino
+        contra este total (ver `SalesService.complete_sale`)."""
+        result = self._session.execute(
+            select(func.coalesce(func.sum(StockLevel.quantity), 0)).where(
+                StockLevel.product_id == product_id
+            )
+        ).scalar()
+        return result if result is not None else Decimal(0)
 
     def ensure_stock_level(self, product_id: int, warehouse_id: int) -> StockLevel:
         stock_level = self.get_stock_level(product_id, warehouse_id)
@@ -68,6 +93,73 @@ class InventoryRepository:
             .join(Warehouse, Warehouse.id == StockLevel.warehouse_id)
             .outerjoin(StockAlertConfig, StockAlertConfig.product_id == StockLevel.product_id)
             .where(Product.is_deleted.is_(False))
+            .order_by(Product.name)
+        )
+        return [(row[0], row[1], row[2], row[3], row[4] or Decimal(0)) for row in rows]
+
+    def list_stock_summary(self) -> list[tuple[int, str, str, Decimal, Decimal]]:
+        """Devuelve (product_id, sku, nombre, cantidad_total, cantidad_mínima)
+        — una fila por producto, sumando `StockLevel.quantity` de todas sus
+        bodegas. Base de la pantalla principal de Existencias."""
+        rows = self._session.execute(
+            select(
+                Product.id,
+                Product.sku,
+                Product.name,
+                func.coalesce(func.sum(StockLevel.quantity), 0),
+                StockAlertConfig.min_quantity,
+            )
+            .join(StockLevel, StockLevel.product_id == Product.id)
+            .outerjoin(StockAlertConfig, StockAlertConfig.product_id == Product.id)
+            .where(Product.is_deleted.is_(False))
+            .group_by(Product.id, Product.sku, Product.name, StockAlertConfig.min_quantity)
+            .order_by(Product.name)
+        )
+        return [(row[0], row[1], row[2], row[3], row[4] or Decimal(0)) for row in rows]
+
+    def list_stock_overview_for_product(
+        self, product_id: int
+    ) -> list[tuple[StockLevel, str, str, str, Decimal]]:
+        """Misma forma que `list_stock_overview` pero filtrada a un solo
+        producto — incluye bodegas en 0, para el detalle "Ver"."""
+        rows = self._session.execute(
+            select(
+                StockLevel,
+                Product.sku,
+                Product.name,
+                Warehouse.name,
+                StockAlertConfig.min_quantity,
+            )
+            .join(Product, Product.id == StockLevel.product_id)
+            .join(Warehouse, Warehouse.id == StockLevel.warehouse_id)
+            .outerjoin(StockAlertConfig, StockAlertConfig.product_id == StockLevel.product_id)
+            .where(Product.is_deleted.is_(False), StockLevel.product_id == product_id)
+            .order_by(Warehouse.name)
+        )
+        return [(row[0], row[1], row[2], row[3], row[4] or Decimal(0)) for row in rows]
+
+    def list_stock_overview_for_warehouse(
+        self, warehouse_id: int
+    ) -> list[tuple[StockLevel, str, str, str, Decimal]]:
+        """Misma forma que `list_stock_overview` pero filtrada a una sola
+        bodega y solo con cantidad > 0 — para "Bodegas → Ver productos",
+        donde no tiene sentido listar todo el catálogo en 0."""
+        rows = self._session.execute(
+            select(
+                StockLevel,
+                Product.sku,
+                Product.name,
+                Warehouse.name,
+                StockAlertConfig.min_quantity,
+            )
+            .join(Product, Product.id == StockLevel.product_id)
+            .join(Warehouse, Warehouse.id == StockLevel.warehouse_id)
+            .outerjoin(StockAlertConfig, StockAlertConfig.product_id == StockLevel.product_id)
+            .where(
+                Product.is_deleted.is_(False),
+                StockLevel.warehouse_id == warehouse_id,
+                StockLevel.quantity > 0,
+            )
             .order_by(Product.name)
         )
         return [(row[0], row[1], row[2], row[3], row[4] or Decimal(0)) for row in rows]
@@ -113,6 +205,29 @@ class InventoryRepository:
         self._session.flush()
         return movement
 
+    def sum_exits_by_reference(
+        self, *, reference_document_type: str, reference_document_id: int
+    ) -> list[tuple[int, int, Decimal]]:
+        """Cantidad total de salida (`StockMovementType.EXIT`) por
+        producto/bodega para un documento de referencia (ej. una venta) —
+        permite reconstruir de qué bodega(s) exactas salió cada producto en
+        vez de asumir una sola bodega, ya que `_allocate_and_register_exit`
+        puede repartir una misma línea entre varias."""
+        rows = self._session.execute(
+            select(
+                StockMovement.product_id,
+                StockMovement.warehouse_id,
+                func.sum(StockMovement.quantity),
+            )
+            .where(
+                StockMovement.movement_type == StockMovementType.EXIT,
+                StockMovement.reference_document_type == reference_document_type,
+                StockMovement.reference_document_id == reference_document_id,
+            )
+            .group_by(StockMovement.product_id, StockMovement.warehouse_id)
+        ).all()
+        return [(row[0], row[1], row[2]) for row in rows]
+
     def list_movements_for_product(self, product_id: int) -> list[StockMovement]:
         return list(
             self._session.scalars(
@@ -121,3 +236,15 @@ class InventoryRepository:
                 .order_by(StockMovement.created_at.desc())
             )
         )
+
+    def list_movements(self) -> list[tuple[StockMovement, str, str, str]]:
+        """Devuelve (movimiento, sku, nombre_producto, nombre_bodega) del
+        historial completo, más reciente primero — para la pantalla
+        "Movimientos"."""
+        rows = self._session.execute(
+            select(StockMovement, Product.sku, Product.name, Warehouse.name)
+            .join(Product, Product.id == StockMovement.product_id)
+            .join(Warehouse, Warehouse.id == StockMovement.warehouse_id)
+            .order_by(StockMovement.created_at.desc())
+        )
+        return [(row[0], row[1], row[2], row[3]) for row in rows]

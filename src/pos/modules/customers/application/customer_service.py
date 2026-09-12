@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from pos.core.database.session import session_scope
@@ -13,6 +14,11 @@ from pos.modules.customers.infrastructure.models import (
     LoyaltyPointsMovementType,
 )
 from pos.modules.customers.infrastructure.repository import CustomerRepository
+
+_HAS_DEBT_MESSAGE = (
+    "No es posible eliminar este cliente porque tiene deudas pendientes. "
+    "Primero debe cancelar todas sus facturas."
+)
 
 
 def _to_dto(customer: Customer, current_debt: Decimal) -> CustomerDTO:
@@ -26,6 +32,7 @@ def _to_dto(customer: Customer, current_debt: Decimal) -> CustomerDTO:
         credit_limit=customer.credit_limit,
         current_debt=current_debt,
         loyalty_points_balance=customer.loyalty_points_balance,
+        credit_history_cleared_at=customer.credit_history_cleared_at,
     )
 
 
@@ -83,7 +90,26 @@ class CustomerManagementService:
             customer = repo.get(customer_id)
             if customer is None:
                 raise NotFoundError(f"No existe el cliente con id={customer_id}.")
+            if repo.get_current_debt(customer_id) != Decimal(0):
+                raise BusinessRuleViolationError(_HAS_DEBT_MESSAGE)
             repo.set_deleted(customer, True)
+
+    def clear_credit_history(self, customer_id: int) -> None:
+        """"Borrar historial" (Cuentas por Cobrar): nunca borra facturas,
+        ventas ni recibos — solo mueve la fecha de corte que oculta lo ya
+        saldado de las dos tablas de historial (`BillingService.
+        list_customer_debt_history`/`list_customer_payment_receipts`),
+        para que el módulo de crédito se vea vacío y se pueda "empezar de
+        nuevo". Solo permitido con deuda exactamente en cero, igual que la
+        validación de `remove_customer`."""
+        with session_scope() as session:
+            repo = CustomerRepository(session)
+            customer = repo.get(customer_id)
+            if customer is None:
+                raise NotFoundError(f"No existe el cliente con id={customer_id}.")
+            if repo.get_current_debt(customer_id) != Decimal(0):
+                raise BusinessRuleViolationError(_HAS_DEBT_MESSAGE)
+            customer.credit_history_cleared_at = datetime.now(UTC)
 
     def register_credit_movement(
         self,

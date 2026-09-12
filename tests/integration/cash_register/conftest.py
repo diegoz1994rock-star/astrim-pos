@@ -12,7 +12,6 @@ from pos.core.database import model_registry
 from pos.core.database.session import init_engine, session_scope
 from pos.core.events.bus import EventBus
 from pos.modules.cash_register.application.cash_register_service import CashRegisterService
-from pos.modules.roles.infrastructure.models import Role
 from pos.modules.users.infrastructure.models import User
 
 
@@ -39,14 +38,10 @@ def user_id(sqlite_engine: None) -> int:
     verdad (ver core.database.session, PRAGMA foreign_keys=ON), así que las
     pruebas necesitan un usuario real, no un id inventado."""
     with session_scope() as session:
-        role = Role(name="Cajero", is_system_role=True)
-        session.add(role)
-        session.flush()
         user = User(
             username="cajero_test",
             password_hash="hash-no-relevante",
             full_name="Cajero de Prueba",
-            role_id=role.id,
             is_active=True,
         )
         session.add(user)

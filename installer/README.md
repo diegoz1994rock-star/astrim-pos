@@ -1,58 +1,71 @@
-# Instalador de Windows
+# Instalador de Windows — ASTRIM POS
 
-Empaqueta el Sistema POS como un instalador tipo asistente para Windows
+Empaqueta ASTRIM POS como un instalador tipo asistente para Windows
 ("Siguiente → Siguiente → Instalar → Finalizar", PROJECT_SPEC.md, sección
 INSTALADOR), sin que el cliente final necesite tener Python instalado.
+
+Para el paso a paso operativo de "cómo genero una versión nueva", ver
+[`README_BUILD.md`](../README_BUILD.md) en la raíz del repo — usa
+`build_scripts\build.bat`/`.ps1`, que hacen los dos pasos de abajo en el
+orden correcto con un solo comando. Este documento es la referencia
+técnica de por qué `pos.spec`/`setup.iss` están configurados como están.
 
 Dos pasos, en ese orden:
 
 1. **PyInstaller** (`pos.spec`) empaqueta la app y todas sus dependencias
-   en una carpeta autocontenida `dist/pos/` con `pos.exe` adentro.
-2. **Inno Setup** (`setup.iss`) toma esa carpeta y genera un único
-   instalador `.exe` que la copia al equipo del cliente, crea accesos
-   directos y un desinstalador.
+   en una carpeta autocontenida `dist/ASTRIM_POS/` con `ASTRIM_POS.exe`
+   adentro. También escribe la versión (leída de `pyproject.toml`), el
+   nombre y el fabricante como recurso `VERSIONINFO` real de Windows en
+   el `.exe`.
+2. **Inno Setup** (`setup.iss`) toma esa carpeta y genera el instalador
+   `ASTRIM_POS_Setup_vX.Y.Z.exe`, que la copia al equipo del cliente,
+   crea accesos directos y un desinstalador. La versión del instalador
+   **no se declara a mano**: `setup.iss` la lee de vuelta del `.exe` ya
+   compilado (`GetFileVersionString`), así nunca puede desincronizarse.
 
 ## Requisito: debe construirse en Windows real
 
 PyInstaller **no hace cross-compilación** — un ejecutable de Windows solo
 se puede generar corriendo PyInstaller *en* Windows (máquina física, VM, o
-un runner de CI con `windows-latest`). Este repositorio se desarrolló en
-macOS; `pos.spec` se diseñó y se verificó de la mejor forma posible sin
-Windows disponible:
+un runner de CI con `windows-latest`). Inno Setup tampoco corre en macOS
+(ni siquiera con Wine de forma confiable).
 
-- `pos.spec` se escribió siguiendo la estructura estándar de PyInstaller
-  (`Analysis`/`PYZ`/`EXE`/`COLLECT`, modo `--onedir`) con los `datas`
-  (`alembic.ini`, `migrations/`) y los `hiddenimports` de `uvicorn` que
-  requiere este proyecto en concreto — no se pudo instalar `pyinstaller`
-  en este entorno de desarrollo en sandbox para correr un build real de
-  humo (la instalación por `pip` no completó, entorno con red
-  restringida), así que **no está probado en ejecución**, solo revisado
-  manualmente y verificado con `ast.parse` (sintaxis Python válida). Antes
-  de distribuir, correr `pyinstaller installer/pos.spec` en Windows real y
-  confirmar que `dist\pos\pos.exe` arranca — es el primer paso pendiente,
-  no asumir que funciona a la primera sin probarlo.
-- **Pendiente de validar en una máquina Windows real** antes del primer
-  release: build de `pos.spec`, build de `setup.iss`, e instalación +
-  primer arranque completos en un Windows limpio.
+**Validado con un build real en Windows** (no solo revisión estática del
+`.spec`): `pyinstaller installer/pos.spec --noconfirm` con
+PyInstaller 6.21 terminó "Build complete!" y el `.exe` resultante se
+ejecutó de verdad — aplicó las migraciones de Alembic, copió
+`licenses_pool.db`, calculó el Hardware ID vía el registro de Windows y
+abrió la ventana principal sin errores. En esa primera corrida real
+apareció y se corrigió un bug real (`migrations/env.py` no se analiza
+como código por ir empaquetado como dato suelto, así que su
+`from pos.core.database import model_registry` no se detectaba —
+ver `hidden_imports` en `pos.spec` y la sección de problemas comunes en
+`README_BUILD.md`). El instalador (`setup.iss`) también se compiló y
+generó `ASTRIM_POS_Setup_v2.0.0.exe` sin errores con Inno Setup 6.7.3.
 
 ## Paso a paso (en Windows, con Python 3.11+ y Git ya instalados)
 
 ```powershell
-git clone <repo> pos-system
-cd pos-system
+git clone <repo> astrim-pos
+cd astrim-pos
 python -m venv .venv
 .venv\Scripts\activate
 pip install -e ".[build]"
 
-# 1) Empaquetar con PyInstaller (genera dist\pos\pos.exe + dependencias)
+# 1) Empaquetar con PyInstaller (genera dist\ASTRIM_POS\ASTRIM_POS.exe + dependencias)
 pyinstaller installer\pos.spec --noconfirm
 
 # 2) Compilar el instalador con Inno Setup (requiere tener Inno Setup
-#    instalado: https://jrsoftware.org/isinfo.php)
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
+#    instalado: winget install --id JRSoftware.InnoSetup, o
+#    https://jrsoftware.org/isinfo.php)
+ISCC installer\setup.iss
 
-# El instalador queda en installer\dist_installer\SistemaPOS-Setup-<version>.exe
+# El instalador queda en installer\dist_installer\ASTRIM_POS_Setup_vX.Y.Z.exe
 ```
+
+En la práctica, usa `build_scripts\build.bat` (o `.ps1`) en vez de correr
+estos dos comandos a mano — hace lo mismo, además de limpiar builds
+anteriores y armar `release/` con los artefactos finales.
 
 ## Qué hace la app en el primer arranque de un cliente real
 
@@ -70,6 +83,20 @@ La licencia (ver `modules/licensing/`) se activa aparte, con la clave que
 entregue el vendedor — el primer arranque bloquea el acceso hasta activarla,
 antes incluso de la pantalla de configuración inicial.
 
+## Instalación en Program Files + carpeta en ProgramData
+
+Esta versión del instalador (`setup.iss`) instala en
+`C:\Program Files\ASTRIM POS\` (requiere permisos de administrador durante
+la instalación — antes se instalaba sin pedir elevación, ver el comentario
+en `[Setup]` de `setup.iss` sobre ese cambio) y crea además
+`C:\ProgramData\ASTRIM\` con permisos de escritura para cuentas estándar.
+
+Importante: esa carpeta de ProgramData queda **reservada para uso futuro**
+— la aplicación en sí **no cambió**; sigue guardando la base de datos, la
+licencia y los respaldos en `%USERPROFILE%\.pos_system` exactamente como
+antes (no se tocó lógica de negocio en esta tarea, ver
+`core/config/bootstrap.py::get_app_data_dir`).
+
 ## Actualizaciones
 
 Reinstalar una versión nueva sobre una instalación existente (mismo
@@ -78,16 +105,29 @@ base de datos intacta (vive en `%USERPROFILE%\.pos_system`, fuera de la
 carpeta de instalación) — las migraciones pendientes de la nueva versión
 se aplican solas en el siguiente arranque, igual que en cualquier otro.
 
-## Ícono de la aplicación
+## Inicio automático con Windows
 
-`pos.spec` usa `resources/icons/pos.ico` si existe; si no, PyInstaller usa
-su ícono por defecto. Agregar un `.ico` real (múltiples resoluciones,
-16–256px) ahí antes de un release público — no se generó ninguno en esta
-pasada (ver `resources/`, "activos de marca por defecto", pendiente).
+El instalador ofrece una tarea opcional ("Iniciar ASTRIM POS
+automáticamente al encender el equipo") que crea un acceso directo en la
+carpeta de inicio compartida de Windows (`{commonstartup}`) — pensada para
+equipos de punto de venta donde el terminal debe abrir la app solo, sin
+que el cajero tenga que buscarla cada turno. Es opcional (casilla
+desmarcable durante la instalación) y se retira solo al desinstalar.
+
+## Ícono y marca
+
+`pos.spec` usa `resources/icons/pos.ico` (generado a partir de
+`docs/branding/logo.png`, multi-resolución 16–256px). El instalador usa
+además `installer/assets/wizard_image.bmp` y `wizard_small.bmp`
+(generados de los mismos activos de marca) para el logo del asistente, y
+el eslogan "Tecnología que impulsa tu negocio." en la pantalla de
+bienvenida (`[Messages] spanish.WelcomeLabel2` en `setup.iss`). Si el
+logo cambia, hay que regenerar estos tres archivos (no hay un script de
+build para esto todavía, se generó una sola vez con Pillow).
 
 ## Firma de código (recomendado para producción, no configurado aquí)
 
 Windows SmartScreen advierte sobre ejecutables sin firmar. Para un release
-real, firmar `pos.exe` (o el instalador final) con un certificado de firma
-de código antes de distribuirlo — fuera de alcance de esta pasada (requiere
-comprar un certificado, decisión del vendedor, no técnica).
+real, firmar `ASTRIM_POS.exe` (o el instalador final) con un certificado de
+firma de código antes de distribuirlo — fuera de alcance de esta pasada
+(requiere comprar un certificado, decisión del vendedor, no técnica).
