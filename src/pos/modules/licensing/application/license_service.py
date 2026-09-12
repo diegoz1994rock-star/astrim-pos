@@ -72,7 +72,11 @@ from pos.modules.licensing.infrastructure.hardware import (
     get_device_name,
     get_hardware_fingerprint,
 )
-from pos.modules.licensing.infrastructure.models import AuthorizedDevice, License, LicenseHistoryEntry
+from pos.modules.licensing.infrastructure.models import (
+    AuthorizedDevice,
+    License,
+    LicenseHistoryEntry,
+)
 from pos.modules.licensing.infrastructure.pool_code_generator import split_hardware_prefixed_code
 from pos.modules.licensing.infrastructure.pool_db import LicensePoolDatabase
 from pos.modules.licensing.infrastructure.pool_repository import LicensePoolRepository

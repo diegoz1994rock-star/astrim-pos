@@ -5,11 +5,11 @@ from __future__ import annotations
 from pos.core.database.session import session_scope
 from pos.core.exceptions import BusinessRuleViolationError, ConflictError, NotFoundError
 from pos.modules.job_positions.application.dto import JobAreaDTO, JobPositionDTO
-from pos.modules.job_positions.domain.permission_catalog import PERMISSION_CATALOG
 from pos.modules.job_positions.application.system_bootstrap import (
     ensure_admin_position,
     ensure_default_job_catalog,
 )
+from pos.modules.job_positions.domain.permission_catalog import PERMISSION_CATALOG
 from pos.modules.job_positions.infrastructure.repository import JobPositionRepository
 
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import tempfile
 from datetime import date as date_
+from decimal import Decimal
 from pathlib import Path
 
 from PySide6.QtCore import QDate, QModelIndex, Qt, QUrl
@@ -463,7 +464,7 @@ class ProfitsTabView(QWidget):
                 ChartSeriesPoint(
                     label=group.category_name,
                     sales_total=group.total_revenue,
-                    profit_total=group.total_profit or 0,
+                    profit_total=group.total_profit or Decimal(0),
                 )
                 for group in series.profit_by_category
             ]
@@ -520,7 +521,7 @@ class ProfitsTabView(QWidget):
         return "; ".join(parts) if parts else "Sin filtros"
 
     def _current_user_name(self) -> str:
-        session = self._session_manager.current()
+        session = self._session_manager.current
         return session.full_name if session else "—"
 
     def _on_export_excel_clicked(self) -> None:

@@ -17,8 +17,8 @@ en el renderizador de PDF), pero nunca vuelve a calcular su tamaño."""
 from __future__ import annotations
 
 import io
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import barcode as barcode_lib
 import qrcode

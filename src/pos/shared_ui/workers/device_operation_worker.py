@@ -21,6 +21,12 @@ class DeviceOperationWorker(QThread):
     def __init__(self, operation: Callable[[], Any], parent: Any = None) -> None:
         super().__init__(parent)
         self._operation = operation
+        self.finished.connect(self.deleteLater)
+        """Sin esto, cada operación (Conectar/Probar/Leer) creaba un
+        `QThread` nuevo que nunca se liberaba — quien lo usa solo
+        reemplaza su referencia (`self._worker = worker`) en la
+        siguiente operación, así que los anteriores, ya terminados,
+        se iban acumulando en memoria durante toda la vida del diálogo."""
 
     def run(self) -> None:
         try:

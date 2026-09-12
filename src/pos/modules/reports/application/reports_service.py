@@ -4,7 +4,7 @@ exportación a PDF y Excel (PROJECT_SPEC.md, "REPORTES")."""
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -83,7 +83,7 @@ class ReportsService:
             sale_rows = repo.sale_totals_rows(date_from, date_to)
             profit_rows = repo.sale_item_profit_rows(date_from, date_to)
 
-        def bucket_key(created_at: date) -> str:
+        def bucket_key(created_at: datetime) -> str:
             local = created_at.astimezone()
             return f"{local:%Y-%m}" if monthly else f"{local:%Y-%m-%d}"
 

@@ -71,10 +71,14 @@ class RegisterPaymentDialog(QDialog):
 
     def _on_accept(self) -> None:
         try:
-            amount = Decimal(self._amount_edit.text())
+            amount = Decimal(self._amount_edit.text()).quantize(Decimal("0.01"))
         except InvalidOperation:
             QMessageBox.warning(self, "Error", "El monto debe ser un número válido.")
             return
+        """Sin cuantizar, un monto tecleado con más de 2 decimales (ej.
+        "1000.999") podía dejar un saldo residual imposible de saldar
+        después — `Invoice.balance_due` es `Numeric(12, 2)`, así que el
+        abono debe tener la misma precisión."""
         if amount <= 0:
             QMessageBox.warning(self, "Error", "El monto debe ser mayor que cero.")
             return

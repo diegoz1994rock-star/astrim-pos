@@ -61,7 +61,7 @@ class ProductSaleHistoryDialog(QDialog):
                 entry.customer_name,
                 entry.user_name,
                 entry.cash_register_name,
-                entry.sold_at.strftime("%Y-%m-%d %H:%M"),
+                entry.sold_at.astimezone().strftime("%Y-%m-%d %H:%M"),
                 format_quantity(entry.quantity, entry.sale_unit),
                 _NA if entry.unit_cost is None else format_currency(entry.unit_cost),
                 format_currency(entry.unit_price),

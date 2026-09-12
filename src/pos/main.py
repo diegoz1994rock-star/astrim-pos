@@ -116,7 +116,6 @@ from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
@@ -213,7 +212,6 @@ from pos.modules.printers.presentation.printers_view_model import PrintersViewMo
 from pos.modules.products.application.category_service import CategoryManagementService
 from pos.modules.products.application.product_service import ProductManagementService
 from pos.modules.products.domain.events import ProductCreatedEvent
-from pos.modules.restaurant.domain.events import OrderCreatedEvent
 from pos.modules.products.presentation.categories_view import CategoriesView
 from pos.modules.products.presentation.categories_view_model import CategoriesViewModel
 from pos.modules.products.presentation.products_view import ProductsView
@@ -229,6 +227,7 @@ from pos.modules.reports.application.reports_service import ReportsService
 from pos.modules.reports.presentation.reports_view import ReportsView
 from pos.modules.reports.presentation.reports_view_model import ReportsViewModel
 from pos.modules.restaurant.application.restaurant_service import RestaurantService
+from pos.modules.restaurant.domain.events import OrderCreatedEvent
 from pos.modules.restaurant.presentation.restaurant_view import RestaurantView
 from pos.modules.restaurant.presentation.restaurant_view_model import RestaurantViewModel
 from pos.modules.sales.application.sale_service import SalesService

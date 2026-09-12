@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFormLayout,
@@ -33,7 +32,12 @@ from pos.modules.licensing.application.dto import (
     LicenseUsageDTO,
     LicenseVerificationDTO,
 )
-from pos.modules.licensing.domain.enums import LicenseHistoryAction, LicenseStatus, LicenseType, LicenseVerificationResult
+from pos.modules.licensing.domain.enums import (
+    LicenseHistoryAction,
+    LicenseStatus,
+    LicenseType,
+    LicenseVerificationResult,
+)
 from pos.modules.licensing.presentation.authorized_devices_dialog import AuthorizedDevicesDialog
 from pos.modules.licensing.presentation.license_dashboard_view_model import (
     LicenseDashboardViewModel,

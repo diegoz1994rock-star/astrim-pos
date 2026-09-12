@@ -27,7 +27,13 @@ from pos.modules.restaurant.application.dto import (
     OrderItemDTO,
     TableSessionDTO,
 )
-from pos.modules.restaurant.domain.enums import OrderItemStatus, OrderOrigin, OrderStatus, OrderType, TableStatus
+from pos.modules.restaurant.domain.enums import (
+    OrderItemStatus,
+    OrderOrigin,
+    OrderStatus,
+    OrderType,
+    TableStatus,
+)
 from pos.modules.restaurant.domain.events import OrderCreatedEvent
 from pos.modules.restaurant.infrastructure.models import DiningTable, Order, TableSession
 from pos.modules.restaurant.infrastructure.repository import RestaurantRepository

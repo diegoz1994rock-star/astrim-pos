@@ -59,15 +59,32 @@ class InventoryRepository:
         )
 
     def get_total_available_quantity(self, product_id: int) -> Decimal:
-        """Suma de `StockLevel.quantity` en todas las bodegas para un
+        """Suma de `StockLevel.quantity` en las bodegas ACTIVAS para un
         producto — la venta ya no valida contra una sola bodega, sino
-        contra este total (ver `SalesService.complete_sale`)."""
+        contra este total (ver `SalesService.complete_sale`). Una bodega
+        desactivada no es "vendible" en la práctica (ver `set_warehouse_
+        active`), así que su stock no debe contar como disponible aunque
+        la fila de `StockLevel` siga existiendo."""
         result = self._session.execute(
-            select(func.coalesce(func.sum(StockLevel.quantity), 0)).where(
-                StockLevel.product_id == product_id
-            )
+            select(func.coalesce(func.sum(StockLevel.quantity), 0))
+            .join(Warehouse, Warehouse.id == StockLevel.warehouse_id)
+            .where(StockLevel.product_id == product_id, Warehouse.is_active.is_(True))
         ).scalar()
         return result if result is not None else Decimal(0)
+
+    def sum_available_quantities(self, product_ids: list[int]) -> dict[int, Decimal]:
+        """Igual que `get_total_available_quantity`, pero para varios
+        productos en una sola consulta — evita hacer una consulta (y abrir
+        una sesión) por línea al validar el stock de una venta completa."""
+        if not product_ids:
+            return {}
+        rows = self._session.execute(
+            select(StockLevel.product_id, func.coalesce(func.sum(StockLevel.quantity), 0))
+            .join(Warehouse, Warehouse.id == StockLevel.warehouse_id)
+            .where(StockLevel.product_id.in_(product_ids), Warehouse.is_active.is_(True))
+            .group_by(StockLevel.product_id)
+        ).all()
+        return {product_id: total for product_id, total in rows}
 
     def ensure_stock_level(self, product_id: int, warehouse_id: int) -> StockLevel:
         stock_level = self.get_stock_level(product_id, warehouse_id)

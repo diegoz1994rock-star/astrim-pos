@@ -181,7 +181,16 @@ class ReportsView(QWidget):
     def _on_chart_refresh_clicked(self) -> None:
         monthly = self._chart_period_combo.currentIndex() == 1
         today = date.today()
-        date_from = date(today.year - 1, today.month, 1) if monthly else today - timedelta(days=30)
+        if monthly:
+            """"Últimos 12 meses" son 12 baldes de mes, el actual incluido —
+            `date(today.year - 1, today.month, 1)` daba 13 (el mismo mes
+            hace un año Y el mes actual). Resta 11 meses al primer día del
+            mes actual en vez de 12."""
+            month_index = today.month - 1 - 11
+            date_from = date(today.year + month_index // 12, month_index % 12 + 1, 1)
+        else:
+            # "Últimos 30 días" son 30 días incluyendo hoy, no 31.
+            date_from = today - timedelta(days=29)
         self._view_model.generate_chart(monthly, date_from, today)
 
     def _on_chart_ready(self, points: list[ChartPointDTO]) -> None:

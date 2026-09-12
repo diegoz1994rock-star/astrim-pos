@@ -286,10 +286,14 @@ class SalesService:
                 f"con el total de la venta ({priced.total})."
             )
 
-        for line in priced.lines:
-            if not line.track_inventory:
-                continue
-            available = self._inventory_service.get_total_available_quantity(line.product_id)
+        tracked_lines = [line for line in priced.lines if line.track_inventory]
+        available_by_product = self._inventory_service.sum_available_quantities(
+            [line.product_id for line in tracked_lines]
+        )
+        """Una sola consulta para todas las líneas en vez de una por línea
+        (`get_total_available_quantity` abría su propia sesión cada vez)."""
+        for line in tracked_lines:
+            available = available_by_product.get(line.product_id, Decimal(0))
             if available < line.quantity:
                 raise BusinessRuleViolationError(
                     f"Stock insuficiente para '{line.product_name}': "

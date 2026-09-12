@@ -169,6 +169,13 @@ class InventoryService:
         with session_scope() as session:
             return InventoryRepository(session).get_total_available_quantity(product_id)
 
+    def sum_available_quantities(self, product_ids: list[int]) -> dict[int, Decimal]:
+        """Igual que `get_total_available_quantity`, pero para varios
+        productos en una sola consulta (ver `SalesService.complete_sale`,
+        que antes hacía una consulta por línea de venta)."""
+        with session_scope() as session:
+            return InventoryRepository(session).sum_available_quantities(product_ids)
+
     def list_stock_overview(self) -> list[StockLevelDTO]:
         with session_scope() as session:
             repo = InventoryRepository(session)

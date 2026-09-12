@@ -319,9 +319,8 @@ class UserManagementService:
                 session.delete(user)
                 session.flush()
             return
-        except IntegrityError as e:
-            import traceback
-            traceback.print_exc()
+        except IntegrityError:
+            pass
 
         with session_scope() as session:
             user = UserRepository(session).get_user(user_id)
