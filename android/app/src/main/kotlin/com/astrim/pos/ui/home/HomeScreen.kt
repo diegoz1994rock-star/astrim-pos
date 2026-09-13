@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,8 +26,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -33,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.astrim.pos.BuildConfig
 import com.astrim.pos.R
 import com.astrim.pos.core.network.dto.SessionInfoDto
 import com.astrim.pos.core.session.ModulePermissions
@@ -79,11 +87,16 @@ fun HomeScreen(
         HomeModule("Caja", "💰", ModulePermissions.CASH_REGISTER, onOpenCashRegister),
     ).filter { hasModuleAccess(session, it.permissionCode) }
 
+    var showAboutDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("ASTRIM") },
                 actions = {
+                    IconButton(onClick = { showAboutDialog = true }) {
+                        Icon(Icons.Default.Info, contentDescription = "Acerca de")
+                    }
                     IconButton(onClick = onLogout) {
                         Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión")
                     }
@@ -153,6 +166,46 @@ fun HomeScreen(
             }
         }
     }
+
+    if (showAboutDialog) {
+        AboutDialog(onDismiss = { showAboutDialog = false })
+    }
+}
+
+/**
+ * Mismo contenido que el diálogo "Acerca de" del escritorio
+ * (`shared_ui/widgets/about_dialog.py`): versión instalada (real, tomada de
+ * [BuildConfig], nunca hardcodeada) y el aviso de copyright.
+ */
+@Composable
+private fun AboutDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Aceptar") }
+        },
+        title = { Text("Acerca de ASTRIM POS") },
+        text = {
+            Column {
+                Text(
+                    text = "Versión ${BuildConfig.VERSION_NAME}",
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Copyright © 2026 ASTRIM. Todos los derechos reservados.",
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                Text(
+                    text = "Este software y su código fuente son propiedad de sus " +
+                        "autores. No se concede ninguna licencia de uso, copia, " +
+                        "modificación o distribución salvo que se acuerde por " +
+                        "escrito con el titular de los derechos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+    )
 }
 
 @Composable

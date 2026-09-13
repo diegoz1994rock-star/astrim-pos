@@ -267,6 +267,7 @@ from pos.modules.users.presentation.users_view_model import UsersViewModel
 from pos.shared_ui.formatting import format_currency
 from pos.shared_ui.theme.fonts import load_bundled_fonts
 from pos.shared_ui.theme.theme_manager import ThemeManager
+from pos.shared_ui.widgets.about_dialog import AboutDialog
 from pos.shared_ui.widgets.kpi_card import KpiCard
 from pos.shared_ui.widgets.quick_access_panel import QuickAccessPanel
 from pos.shared_ui.widgets.top_bar import TopBar
@@ -1138,6 +1139,7 @@ def build_welcome_widget(
         role_label=role_label,
         branch_label=branch_label,
         on_logout=on_logout,
+        on_about=lambda: AboutDialog(top_bar).exec(),
         on_open_dispatch=dispatch_panel.on_click if dispatch_panel is not None else None,
     )
     top_bar.set_pending_dispatch_count(metrics.pending_dispatch_count)

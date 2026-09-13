@@ -5,6 +5,12 @@ La versión de referencia es `[project].version` en `pyproject.toml` — es la
 única fuente de verdad; el instalador y el `.exe` la leen de ahí (ver
 `README_BUILD.md`).
 
+## [2.1.0]
+
+### Agregado
+- Botón "Acerca de" en la barra superior (junto a "Cerrar sesión") que abre
+  un diálogo con la versión instalada y el aviso de copyright completo.
+
 ## [2.0.0] — primera versión distribuible con instalador de Windows
 
 ### Agregado

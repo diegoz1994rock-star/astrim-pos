@@ -1,6 +1,6 @@
 [project]
 name = "pos-system"
-version = "2.0.0"
+version = "2.1.0"
 description = "Sistema POS profesional, modular y configurable para cualquier tipo de negocio."
 requires-python = ">=3.11"
 readme = "README.md"

@@ -130,6 +130,7 @@ class TopBar(QFrame):
         role_label: str,
         branch_label: str,
         on_logout: Callable[[], None],
+        on_about: Callable[[], None],
         on_open_dispatch: Callable[[], None] | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -197,6 +198,16 @@ class TopBar(QFrame):
         user_chip_layout.setContentsMargins(SPACING_SM, SPACING_XS, SPACING_SM, SPACING_XS)
         user_chip_layout.addWidget(user_button)
         layout.addWidget(user_chip)
+
+        about_button = QToolButton(self)
+        about_button.setText("Acerca de")
+        about_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        about_button.setStyleSheet(
+            "QToolButton { border: none; background: transparent; padding: 0; }"
+        )
+        about_button.setProperty("role", "secondary")
+        about_button.clicked.connect(on_about)
+        layout.addWidget(about_button)
 
     def _update_datetime(self) -> None:
         self._datetime_label.setText(_format_datetime_es(datetime.now()))
